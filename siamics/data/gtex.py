@@ -15,7 +15,3 @@ def data_loader(file_path):
         print(df.shape)
         print(df.columns)
     return df
-
-
-path = "/projects/ovcare/classification/Behnam/datasets/genomics/GTEx/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct.gz"
-data = data_loader(path)

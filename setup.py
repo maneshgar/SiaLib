@@ -7,7 +7,7 @@ README = (HERE / "README.md").read_text()
 setup(
     name='siamics',
     version='1.0',
-    packages=['siamics', 'siamics.data', 'siamics.data.gtex', 'siamics.data.geo', 'siamics.models', 'siamics.models.scGPT', 'siamics.utils'],
+    packages=['siamics', 'siamics.data', 'siamics.models', 'siamics.models.scGPT', 'siamics.utils'],
 
     description='SiaMics: Genomics deep learning library',
     author='Behnam (Ben) Maneshgar',
