@@ -42,9 +42,6 @@ def download(root, format='RAW'):
         elif format == 'TPM':
             file = f"{gse_id}_norm_counts_TPM_GRCh38.p13_NCBI.tsv.gz"
             url = f"https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc={gse_id}&format=file&file={file}"
-        elif format == "ANNO":
-            file= "Human.GRCh38.p13.annot.tsv.gz"
-            url = f"https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc={gse_id}&format=file&file={file}"
         elif format == "SOFT":
             file= f"{gse_id}_family.soft.gz"
             url = f"https://ftp.ncbi.nlm.nih.gov/geo/series/{gse_id[:-3]}nnn/{gse_id}/soft/{file}"
