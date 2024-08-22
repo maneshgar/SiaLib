@@ -6,7 +6,6 @@ class Data:
     def __init__(self, dataset):
         self.dataset = dataset
         self.root= os.path.join("/projects/ovcare/classification/Behnam/datasets/genomics/", dataset)
-        self.geneID = "gene_id"
 
     def get_gene_id(self):
        return self.geneID
@@ -29,7 +28,9 @@ class Data:
 
     def load_data(self, rel_path, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0):
         file_path = os.path.join(self.root, rel_path)
-        self.df = pd.read_csv(file_path, sep=sep, comment='#', index_col=index_col, usecols=usecols, nrows=nrows, skiprows)
+        print(f"Loading data: {file_path} ... ", end="")
+        self.df = pd.read_csv(file_path, sep=sep, comment='#', index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows)
+        print("   Done!")
         return self.df
     
     def save_data(self, rel_path):

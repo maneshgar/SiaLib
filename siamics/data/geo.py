@@ -5,8 +5,38 @@ import logging
 import pandas as pd
 
 from . import Data
-class Geo(Data):
 
+class GEO(Data):
+
+    def __init__(self, organism="HomoSapien", dataType='TPM'):
+        dataset="GEO"
+        self.geneID = 'GeneID'
+        super().__init__(dataset)
+
+        self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
+                             'MusMusculus': 'rna_seq_MusMusculus'}
+        
+        self.type_suffix={'RAW':'_raw_counts_GRCh38.p13_NCBI.tsv.gz',
+                          'TPM':'_norm_counts_TPM_GRCh38.p13_NCBI.tsv.gz',
+                          'FPKM':'_norm_counts_FPKM_GRCh38.p13_NCBI.tsv.gz',
+                          'META':'_family.soft.gz'}
+        
+        if organism in self.organisms_dir.keys(): self.organism=organism
+        else: raise ValueError
+
+        if dataType in self.type_suffix.keys(): self.dataType=dataType
+        else: raise ValueError
+
+        self.root = os.path.join(self.root, self.organisms_dir[self.organism])
+
+    def load_by_UID(self, uid, sep="\t", index_col=0, usecols=None, nrows=None, skiprows=0, proc=True):
+        gseID = "GSE" + str(int(str(uid)[3:]))
+        rel_path=os.path.join(uid, (gseID+self.type_suffix[self.dataType]))
+        self.df = super().load_data(rel_path, sep, index_col, usecols, nrows, skiprows)
+        if proc:
+            self.df = self._convert_to_ensg()
+        return self.df
+        
     def download(self, root, format='RAW'):
         # Set up logging for successful downloads
         success_log_file = os.path.join(root, "success_log.txt")
@@ -107,6 +137,23 @@ class Geo(Data):
             print(f"{ind+1}/{len(gse_list)} - {total_count} - Processing file:: {gse}")
 
         return merged_df
+
+    def _convert_to_ensg(self):
+        reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')
+        reference = pd.read_csv(reference_path, sep="\t", usecols=['GeneID', 'EnsemblGeneID'])
+        # merge to match the ids
+        merged_df = pd.merge(reference, self.df, on=self.geneID)
+        # drop NaNs - the geneIds that dont have EnsemblGeneID
+        merged_df = merged_df.dropna(axis='rows', how='any')
+        # set the index to EnsemblGeneID
+        merged_df.index = merged_df['EnsemblGeneID']
+        # drop two extra columns and transpose 
+        merged_df = merged_df.drop(columns=[self.geneID, 'EnsemblGeneID']).T
+        # remove duplicates
+        merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
+        # sort columns  
+        self.df = merged_df[merged_df.columns.sort_values()]
+        return self.df
 
     def count_data(self, gse_list):
         # Count all the data inside each file of the list. 
