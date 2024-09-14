@@ -32,7 +32,7 @@ class GEO(Data):
     def load_by_UID(self, uid, sep="\t", index_col=0, usecols=None, nrows=None, skiprows=0, proc=True):
         gseID = "GSE" + str(int(str(uid)[3:]))
         rel_path=os.path.join(uid, (gseID+self.type_suffix[self.dataType]))
-        self.df = super().load_data(rel_path, sep, index_col, usecols, nrows, skiprows)
+        self.df = super().load(rel_path, sep, index_col, usecols, nrows, skiprows)
         if proc:
             self.df = self._convert_to_ensg()
         return self.df
