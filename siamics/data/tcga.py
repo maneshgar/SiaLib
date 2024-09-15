@@ -84,12 +84,14 @@ class TCGA(Data):
         print(self.counts)
         return sum(self.counts.values())
 
-    def cp_from_server(self, root, output_dir):
+    def cp_from_server(self, root, subtype=None):
         rel_dir="Cases/*/Transcriptome Profiling/Gene Expression Quantification/*/*.tsv"
         # List all the cases
         types_list = glob(os.path.join(root, "*/"))
         types_names = [name.split("/")[-2] for name in types_list]
         for ind, type in enumerate(types_list):
+            if subtype and subtype != types_names[ind]:
+                continue
             filenames = glob(os.path.join(type, rel_dir))
             for file in filenames:
                 file_s = file.split("/TCGA/")[1]
@@ -117,8 +119,8 @@ class TCGA(Data):
 
         # return True
 
-    def gen_ensg(self, raw_dir, data_dir):
-        for batch, index in self.data_loader(batch_size=1, shuffle=True):
+    def gen_ensg(self, raw_dir, data_dir, subtype=None):
+        for batch, _ in self.data_loader(batch_size=1, subtype=subtype,shuffle=False):
             rel_filename = batch.loc[batch.index[0], 'filename'][len(raw_dir)+1:]
             inp_path = os.path.join(raw_dir, rel_filename)
             df = self.load(inp_path, to_ensg=True, usecols=[self.geneID, "tpm_unstranded"], sep="\t").astype(str)

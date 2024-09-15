@@ -34,7 +34,8 @@ class Data:
     def get_catalogue(self, subtype=None):
         df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
         if subtype:
-            raise NotImplementedError
+            df = df[df['subtype'] == subtype]
+            df = df.reset_index(drop=True)
         return df
 
     def data_loader(self, batch_size, subtype=None, shuffle=True, seed=0):
