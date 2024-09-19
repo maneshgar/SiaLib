@@ -3,17 +3,18 @@ import pandas as pd
 from glob import glob
 import subprocess
 
-from . import Data
+from siamics.data import Data
+
 from siamics.utils import futils
 
 class TCGA(Data):
 
     def __init__(self):
         self.geneID = "gene_id"
-        super().__init__("TCGA")
         self.subtypes= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
           'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM']
-        
+        super().__init__("TCGA")
+
     def _gen_catalogue(self, dirname, ext='.csv'):
         sub_list = [] 
         pid_list = [] 
@@ -71,19 +72,7 @@ class TCGA(Data):
     def save(self, data, rel_path, sep=","):
         return super().save(data, rel_path, sep)
 
-    def count_data(self, type_pattern="*.csv"):
-
-        self.counts = {}
-        # List all the cases
-        subtypes_list = glob(os.path.join(self.root, type_pattern))
-        for item in subtypes_list:
-            data = self.load(item)
-            class_name = futils.get_basename(item)
-            self.counts[class_name] = data.shape[1]-1
-
-        print(self.counts)
-        return sum(self.counts.values())
-
+    # AIM function
     def cp_from_server(self, root, subtype=None):
         rel_dir="Cases/*/Transcriptome Profiling/Gene Expression Quantification/*/*.tsv"
         # List all the cases
@@ -129,56 +118,4 @@ class TCGA(Data):
             out_path = os.path.join(data_dir, batch.loc[batch.index[0], 'subtype'], batch.loc[batch.index[0], 'patient_id'], batch.loc[batch.index[0] ,'sample_id']+'.csv')
             futils.create_directories(out_path)
             self.save(df, out_path)
-
-        # # List all the cases
-        # types_list = glob(os.path.join(root, "*/"))
-        # types_names = [name.split("/")[-2] for name in types_list]
-        # columns=None
-        # for ind, type in enumerate(types_list):
-        #     filenames = glob(os.path.join(type, rel_dir))
-        #     df_list = []
-        #     for fid, file in enumerate(filenames):
-        #         file_s = file.split("/TCGA/")[1]
-        #         patient_id = file_s.split("/")[2] 
-        #         sample_id = file_s.split("/")[5]
-        #         print(f"{fid}/{len(filenames)} - {type}-{sample_id}")
-        #         df = self.load(file, to_ensg=True, usecols=[self.geneID, "tpm_unstranded"], sep="\t", index_col=None).astype(str)
-                        
-        #         # New column to append at the beginning
-        #         df.insert(0, 2, ['patient_id', patient_id])
-        #         df.insert(1, 3, ['sample_id', sample_id])
-
-        #         if len(df_list)==0:
-        #             columns= df.loc[self.geneID]
-
-        #         df_list.append(df.iloc[1:2])
-            
-        #     if len(df_list)>0:
-        #         # Concatanate them all. 
-        #         print(f"Merging the loaded data, Len: {len(df_list)} ... ", end="")
-        #         merged_df = pd.concat(df_list, ignore_index=True)     
-        #         merged_df.columns = columns
-        #         print("Done!")
-
-        #         # Saving to file 
-        #         os.makedirs(output_dir, exist_ok=True)
-        #         merged_df.to_csv(os.path.join(output_dir, types_names[ind]+".csv"))
-        #         print(f"Proccessed: {types_names[ind]} with {merged_df.shape[0]} data")
-
-        # return True
-
-
-
-    # def raw_data_loader(self, subtype, batch_size=10, sep=",", index_col=0):
-    #     rel_path = subtype+".csv"
-    #     file_path = os.path.join(self.root, rel_path)
-    #     print(f"Data loader: {file_path}.")
-    #     """Generator to load CSV in chunks using pandas."""
-    #     batch_id = -1
-    #     for self.df in pd.read_csv(file_path, chunksize=batch_size, sep=sep, comment='#', index_col=index_col, header=0):
-    #         batch_id += 1
-    #         print(f'Batch {batch_id} loaded.')
-    #         proc_df = self.df
-    #         proc_df.index = proc_df['sample_id']
-    #         proc_df = proc_df.drop(columns=['sample_id', 'patient_id'])
-    #         yield proc_df
+        return 

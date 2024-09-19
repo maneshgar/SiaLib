@@ -1,23 +1,45 @@
-import os
+import os, torch
 import pandas as pd
 import numpy as np
+from torch.utils.data import Dataset
+
 from siamics.utils import futils
 
-class Data:
+class Data(Dataset):
 
     def __init__(self, dataset):
         self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
         self.dataset = dataset
         self.root= os.path.join(self.datasets_path, dataset)
+        try:
+            self.get_catalogue()
+        except:
+            print(f"Warning: {self.dataset} catalogue has not been generated yet!")
+
+
+    def __len__(self):
+        return self.catalogue.shape[0]
+
+    def __getitem__(self, idx):
+        data = self.load(self.catalogue.loc[idx, 'filename'])
+        label = self.catalogue.loc[idx, 'subtype']
+        return data, label
+    
+    def collate_fn(self, batch):
+        data = []
+        labels = []
+        for i in range(len(batch)):
+            data.append(batch[i][0])
+            labels.append(batch[i][1])
+        data_df = pd.concat(data)
+        return data_df, labels
+
 
     def _gen_catalogue(self):
         raise NotImplementedError
 
     def get_gene_id(self):
        return self.geneID
-    
-    def get_data(self):
-       return self.df
     
     def get_common_genes(self, src, dst, ignore_subids=True, keep_duplicates=False):
         if ignore_subids:
@@ -31,15 +53,16 @@ class Data:
         src = src.loc[:,~src.columns.duplicated()]
         return common_genes, src
 
-    def get_catalogue(self, subtype=None):
+    def get_catalogue(self, subtypes=None):
         df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
-        if subtype:
-            df = df[df['subtype'] == subtype]
+        if subtypes:
+            df = df[df['subtype'].isin(subtypes)]
             df = df.reset_index(drop=True)
-        return df
+        self.catalogue = df
+        return self.catalogue
 
-    def data_loader(self, batch_size, subtype=None, shuffle=True, seed=0):
-        data_ptrs = self.get_catalogue(subtype)
+    def data_loader(self, batch_size, subtypes=None, shuffle=True, seed=0):
+        data_ptrs = self.get_catalogue(subtypes)
         data_size = data_ptrs.shape[0]
         indices = np.arange(data_size)
 
@@ -73,13 +96,3 @@ class Data:
         for file in filenames:
             df_lists.append(self.load(file))
         return pd.concat(df_lists, ignore_index=True)
-
-    def count_data(self):
-      return
-    
-    def merge_data(self):
-      return
-       
-    def merge_datasets(self):
-       return
-    
