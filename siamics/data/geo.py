@@ -183,7 +183,7 @@ class GEO(Data):
             gid_list += [uid] * len(samples)
             sid_list += samples
             fnm_list += [rel_path] * len(samples)
-    
+
         self.catalogue= pd.DataFrame({
             'dataset': self.name,
             'subtype': 'Unknown',
