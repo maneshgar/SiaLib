@@ -1,5 +1,6 @@
 import requests
 import os
+from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import logging
 import pandas as pd
@@ -8,10 +9,8 @@ from . import Data
 
 class GEO(Data):
 
-    def __init__(self, organism="HomoSapien", dataType='TPM'):
-        dataset="GEO"
+    def __init__(self, catalogue=None, organism="HomoSapien", dataType='TPM'):
         self.geneID = 'GeneID'
-        super().__init__(dataset)
 
         self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
                              'MusMusculus': 'rna_seq_MusMusculus'}
@@ -20,14 +19,49 @@ class GEO(Data):
                           'TPM':'_norm_counts_TPM_GRCh38.p13_NCBI.tsv.gz',
                           'FPKM':'_norm_counts_FPKM_GRCh38.p13_NCBI.tsv.gz',
                           'META':'_family.soft.gz'}
-        
+
         if organism in self.organisms_dir.keys(): self.organism=organism
         else: raise ValueError
 
         if dataType in self.type_suffix.keys(): self.dataType=dataType
         else: raise ValueError
+        
+        relpath = self.organisms_dir[self.organism]
+        super().__init__("GEO", catalogue, relpath)
 
-        self.root = os.path.join(self.root, self.organisms_dir[self.organism])
+    def _convert_to_ensg(self, df):
+        reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')
+        reference = pd.read_csv(reference_path, sep="\t", usecols=['GeneID', 'EnsemblGeneID'])
+        # merge to match the ids
+        merged_df = pd.merge(reference, df, on=self.geneID)
+        # drop NaNs - the geneIds that dont have EnsemblGeneID
+        merged_df = merged_df.dropna(axis='rows', how='any')
+        # set the index to EnsemblGeneID
+        merged_df.index = merged_df['EnsemblGeneID']
+        # drop two extra columns and transpose 
+        merged_df = merged_df.drop(columns=[self.geneID, 'EnsemblGeneID']).T
+        # remove duplicates
+        merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
+        # sort columns  
+        return merged_df[merged_df.columns.sort_values()]
+
+    def get_ids_from_xml(self, file_path):
+        # Load and parse the XML file
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+
+        # Extract all Id elements and store them in a list
+        ids = [id_elem.text for id_elem in root.find('IdList')]
+        return ids
+    
+    def load(self, rel_path, idx=None, sep='\t', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False, proc=True):
+        df = super().load(rel_path, sep, index_col, usecols, nrows, skiprows, verbos)   
+        if idx:  
+            df = df[self.catalogue.loc[idx, 'sample_id']]
+        if proc: 
+            df = self._convert_to_ensg(df)
+        return df
+
 
     def load_by_UID(self, uid, sep="\t", index_col=0, usecols=None, nrows=None, skiprows=0, proc=True):
         gseID = "GSE" + str(int(str(uid)[3:]))
@@ -35,7 +69,7 @@ class GEO(Data):
         self.df = super().load(rel_path, sep, index_col, usecols, nrows, skiprows)
         if proc:
             self.df = self._convert_to_ensg()
-        return self.df
+        return self.df, rel_path
         
     def download(self, root, format='RAW'):
         # Set up logging for successful downloads
@@ -100,20 +134,10 @@ class GEO(Data):
             else:
                 error_logger.error(f"Failed to download file. Status code: {response.status_code}, GSE ID: {gse_id}, URL: {url}")
 
-        def get_ids_from_xml(file_path):
-            # Load and parse the XML file
-            tree = ET.parse(file_path)
-            root = tree.getroot()
-
-            # Extract all Id elements and store them in a list
-            ids = [id_elem.text for id_elem in root.find('IdList')]
-
-            return ids
-        
         # Main logic
         xml_fname = "IdList.xml"
         xml_path = os.path.join(root, xml_fname)
-        id_list = get_ids_from_xml(xml_path)
+        id_list = self.get_ids_from_xml(xml_path)
 
         for id in id_list:
             gse_id = "GSE" + str(int(str(id)[3:]))
@@ -138,23 +162,6 @@ class GEO(Data):
 
         return merged_df
 
-    def _convert_to_ensg(self):
-        reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')
-        reference = pd.read_csv(reference_path, sep="\t", usecols=['GeneID', 'EnsemblGeneID'])
-        # merge to match the ids
-        merged_df = pd.merge(reference, self.df, on=self.geneID)
-        # drop NaNs - the geneIds that dont have EnsemblGeneID
-        merged_df = merged_df.dropna(axis='rows', how='any')
-        # set the index to EnsemblGeneID
-        merged_df.index = merged_df['EnsemblGeneID']
-        # drop two extra columns and transpose 
-        merged_df = merged_df.drop(columns=[self.geneID, 'EnsemblGeneID']).T
-        # remove duplicates
-        merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
-        # sort columns  
-        self.df = merged_df[merged_df.columns.sort_values()]
-        return self.df
-
     def count_data(self, gse_list):
         # Count all the data inside each file of the list. 
         total = 0
@@ -162,3 +169,28 @@ class GEO(Data):
             df = pd.read_csv(gse, sep='\t')
             total += df.shape[1]
         return total
+    
+    def _gen_catalogue(self):
+        xml_path = "/projects/ovcare/classification/Behnam/datasets/genomics/GEO/rna_seq_HomoSapien/IdList.xml"
+        id_list = self.get_ids_from_xml(xml_path)
+
+        gid_list = [] 
+        sid_list = [] 
+        fnm_list = [] 
+        for uid in tqdm(id_list):
+            data, rel_path = self.load_by_UID(uid)
+            samples = data.index.tolist()
+            gid_list += [uid] * len(samples)
+            sid_list += samples
+            fnm_list += [rel_path] * len(samples)
+    
+        self.catalogue= pd.DataFrame({
+            'dataset': self.name,
+            'subtype': 'Unknown',
+            'group_id': gid_list,
+            'sample_id': sid_list,
+            'filename': fnm_list
+        })
+        self.save(data=self.catalogue, rel_path='catalogue.csv')
+        return self.catalogue
+    

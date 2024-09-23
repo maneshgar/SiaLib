@@ -7,21 +7,25 @@ from siamics.utils import futils
 
 class Data(Dataset):
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, catalogue=None, relpath=""):
         self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
-        self.dataset = dataset
-        self.root= os.path.join(self.datasets_path, dataset)
-        try:
-            self.get_catalogue()
-        except:
-            print(f"Warning: {self.dataset} catalogue has not been generated yet!")
+        self.name = dataset
+        self.root= os.path.join(self.datasets_path, dataset, relpath)
+        
+        if catalogue is not None:
+            self.catalogue = catalogue.reset_index(drop=True)
+        else: 
+            try:
+                self.get_catalogue()
+            except:
+                print(f"Warning: {self.name} catalogue has not been generated yet!")
 
 
     def __len__(self):
         return self.catalogue.shape[0]
 
     def __getitem__(self, idx):
-        data = self.load(self.catalogue.loc[idx, 'filename'])
+        data = self.load(self.catalogue.loc[idx, 'filename'], idx=idx) #5358068 - 200-176156
         label = self.catalogue.loc[idx, 'subtype']
         return data, label
     
@@ -33,7 +37,6 @@ class Data(Dataset):
             labels.append(batch[i][1])
         data_df = pd.concat(data)
         return data_df, labels
-
 
     def _gen_catalogue(self):
         raise NotImplementedError
@@ -54,7 +57,7 @@ class Data(Dataset):
         return common_genes, src
 
     def get_catalogue(self, subtypes=None):
-        df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
+        df = self.load(rel_path='catalogue.csv', sep=',', index_col=0, proc=False)
         if subtypes:
             df = df[df['subtype'].isin(subtypes)]
             df = df.reset_index(drop=True)
@@ -78,11 +81,11 @@ class Data(Dataset):
             batch_id += 1
             yield batch_ptrs, batch_id
 
-    def load(self, rel_path, sep=',', index_col=0, usecols=None, nrows=None, skiprows=0):
+    def load(self, rel_path, sep=',', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False):
         file_path = os.path.join(self.root, rel_path)
-        print(f"Loading data: {file_path} ... ", end="")
+        if verbos: print(f"Loading data: {file_path} ... ", end="")
         df = pd.read_csv(file_path, sep=sep, comment='#', index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows)
-        print("   Done!")
+        if verbos: print("   Done!")
         return df
     
     def save(self, data, rel_path, sep=','):
