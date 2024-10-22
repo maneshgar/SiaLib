@@ -9,11 +9,15 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None):
+    def __init__(self, catalogue=None, cohort=None, root=None, embed_name=None):
         self.geneID = "gene_id"
-        self.subtypes= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
+        if cohort:
+            self.cohorts = cohort
+        else: 
+            self.cohorts= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
           'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM']
-        super().__init__("TCGA", catalogue)
+
+        super().__init__("TCGA", catalogue, cohort=cohort, root=root, embed_name=embed_name)
 
     def _gen_catalogue(self, dirname, ext='.csv'):
         sub_list = [] 
@@ -49,6 +53,17 @@ class TCGA(Data):
         df = df[df.columns.sort_values()]
         return df
 
+    def get_embed_fname(self, path, fm_config_name=None):
+        # fname = 
+        #             # Save the data using pickle
+        #     # out_path = os.path.join(out_dir ,fm_model_name, cohort, pid, get_basename(sid)+".pkl")
+        if self.embed_name:
+            model_name = self.embed_name
+        else: 
+            model_name = fm_config_name
+
+        return f'features/{model_name}/{path[5:-3]}pkl'
+
     def load(self, rel_path, proc=False, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0, ext=None, idx=None):
         if ext:
             rel_path = rel_path + ext
@@ -61,6 +76,10 @@ class TCGA(Data):
     def save(self, data, rel_path, sep=","):
         return super().save(data, rel_path, sep)
 
+    def get_subtype_index(self, str_labels):
+        labels = [self.cohorts.index(l) for l in str_labels]
+        return labels
+    
     # AIM function
     def cp_from_server(self, root, subtype=None):
         rel_dir="Cases/*/Transcriptome Profiling/Gene Expression Quantification/*/*.tsv"

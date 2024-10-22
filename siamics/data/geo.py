@@ -9,7 +9,7 @@ from . import Data
 
 class GEO(Data):
 
-    def __init__(self, catalogue=None, organism="HomoSapien", dataType='TPM'):
+    def __init__(self, catalogue=None, organism="HomoSapien", dataType='TPM', root=None):
         self.geneID = 'GeneID'
 
         self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
@@ -27,7 +27,7 @@ class GEO(Data):
         else: raise ValueError
         
         relpath = self.organisms_dir[self.organism]
-        super().__init__("GEO", catalogue, relpath)
+        super().__init__("GEO", catalogue, relpath, root=root)
 
     def _convert_to_ensg(self, df):
         reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')

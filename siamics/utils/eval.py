@@ -1,20 +1,25 @@
 from sklearn import metrics 
+import pandas as pd
 class Classification: 
 
-    def __init__(self, data, gt_lbl, pred_lbl, average='weighted'):
+    def __init__(self, average='weighted'):
         self.average = average
-        self.gt_lbl = gt_lbl
-        self.pred_lbl = pred_lbl
-        
-        self.update_metrics(data)
+        self.lbls = []
+        self.preds = []
 
-    def update_metrics(self, data):
-        self.accuracy   = metrics.accuracy_score       (data[self.gt_lbl], data[self.pred_lbl])
-        self.precision  = metrics.precision_score      (data[self.gt_lbl], data[self.pred_lbl], average=self.average)
-        self.precision  = metrics.recall_score         (data[self.gt_lbl], data[self.pred_lbl], average=self.average)
-        self.cm         = metrics.confusion_matrix     (data[self.gt_lbl], data[self.pred_lbl])
-        self.report     = metrics.classification_report(data[self.gt_lbl], data[self.pred_lbl])
+    def add_data(self, labels, preds): 
+        self.lbls += labels
+        self.preds += preds
         
-    def print(self):
+    def update_metrics(self):
+        self.accuracy   = metrics.accuracy_score       (self.lbls, self.preds)
+        self.precision  = metrics.precision_score      (self.lbls, self.preds, average=self.average)
+        self.recall     = metrics.recall_score         (self.lbls, self.preds, average=self.average)
+        self.cm         = metrics.confusion_matrix     (self.lbls, self.preds)
+        self.report     = metrics.classification_report(self.lbls, self.preds)
+        
+    def print(self, update=True):
+        if update: 
+            self.update_metrics()
         print(f"Classification Report: \n\n{self.report}")
         print(f"Confusion Matrix: \n{self.cm}")

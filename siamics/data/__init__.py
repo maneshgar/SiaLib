@@ -1,46 +1,75 @@
-import os, torch
+import os, pickle
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
-
+from jax import numpy as jnp
 from siamics.utils import futils
 
 class Data(Dataset):
 
-    def __init__(self, dataset, catalogue=None, relpath=""):
-        self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
+    def __init__(self, dataset, catalogue=None, relpath="", cohort=None, root=None, embed_name=None):
         self.name = dataset
-        self.root= os.path.join(self.datasets_path, dataset, relpath)
+        self.embed_name = embed_name
+
+        if root: 
+            self.root = root
+        else: 
+            self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
+            self.root= os.path.join(self.datasets_path, dataset, relpath)
         
         if catalogue is not None:
             self.catalogue = catalogue.reset_index(drop=True)
         else: 
             try:
-                self.get_catalogue()
+                self.get_catalogue(types=cohort)
             except:
                 print(f"Warning: {self.name} catalogue has not been generated yet!")
-
 
     def __len__(self):
         return self.catalogue.shape[0]
 
     def __getitem__(self, idx):
-        data = self.load(self.catalogue.loc[idx, 'filename'], idx=idx) #5358068 - 200-176156
-        label = self.catalogue.loc[idx, 'subtype']
-        return data, label
+        # if embeddings are available
+        if self.embed_name:
+            epath = self.get_embed_fname(self.catalogue.loc[idx, 'filename'])
+            with open(os.path.join(self.root, epath), 'rb') as f:
+                data = pickle.load(f)
+        else:
+            # print(f'loading: {self.catalogue.loc[idx, "filename"]}')
+            data = self.load(self.catalogue.loc[idx, 'filename'])
+
+        # Getting label 
+        try: 
+            metadata = self.catalogue.loc[idx:idx]
+            # metadata = self.catalogue.loc[idx, 'subtype']
+            # label = self.get_subtype_index(label)
+        except: 
+            metadata = None
+
+        return data, metadata, idx
     
     def collate_fn(self, batch):
         data = []
-        labels = []
+        metadata = []
+        idx = []
         for i in range(len(batch)):
             data.append(batch[i][0])
-            labels.append(batch[i][1])
+            metadata.append(batch[i][1])
+            idx.append(batch[i][2])
         data_df = pd.concat(data)
-        return data_df, labels
+        metadata = pd.concat(metadata)
+        idx = jnp.array(idx)
+        return data_df, metadata, idx
+
+    def cache(self, cdata, path):
+        save(cdata, path)
 
     def _gen_catalogue(self):
         raise NotImplementedError
 
+    def get_subtype_index(self):
+        raise NotImplemented
+    
     def get_gene_id(self):
        return self.geneID
     
@@ -56,16 +85,16 @@ class Data(Dataset):
         src = src.loc[:,~src.columns.duplicated()]
         return common_genes, src
 
-    def get_catalogue(self, subtypes=None):
-        df = self.load(rel_path='catalogue.csv', sep=',', index_col=0, proc=False)
-        if subtypes:
-            df = df[df['subtype'].isin(subtypes)]
+    def get_catalogue(self, types=None):
+        df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
+        if types:
+            df = df[df['subtype'].isin(types)]
             df = df.reset_index(drop=True)
         self.catalogue = df
         return self.catalogue
 
-    def data_loader(self, batch_size, subtypes=None, shuffle=True, seed=0):
-        data_ptrs = self.get_catalogue(subtypes)
+    def data_loader(self, batch_size, cohorts=None, shuffle=True, seed=0):
+        data_ptrs = self.get_catalogue(cohorts)
         data_size = data_ptrs.shape[0]
         indices = np.arange(data_size)
 
@@ -81,7 +110,7 @@ class Data(Dataset):
             batch_id += 1
             yield batch_ptrs, batch_id
 
-    def load(self, rel_path, sep=',', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False):
+    def load(self, rel_path, sep=',', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False, idx=None):
         file_path = os.path.join(self.root, rel_path)
         if verbos: print(f"Loading data: {file_path} ... ", end="")
         df = pd.read_csv(file_path, sep=sep, comment='#', index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows)

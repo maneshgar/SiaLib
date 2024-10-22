@@ -24,9 +24,9 @@ def generate_ensg(raw_dir, data_dir, subtype=None):
 raw_dir = 'raw_data'
 data_dir = 'data'
 
-# import_from_server()
-# generate_catalogue(raw_dir, ext='.tsv')
-# generate_ensg(raw_dir, data_dir, subtype=['LUSC'])
+import_from_server()
+generate_catalogue(raw_dir, ext='.tsv')
+generate_ensg(raw_dir, data_dir, subtype=['LUSC'])
 generate_catalogue(data_dir)
 
 # run_data_loader()
