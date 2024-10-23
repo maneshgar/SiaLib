@@ -12,7 +12,7 @@ def create_learning_rate_fn(num_epochs, warmup_epochs, base_learning_rate, steps
 # Initialize optimizer state
 def initialize_optimizer(params, nb_epochs, steps_per_epoch):
     # Optimizer setup
-    learning_rate = 1e-43
+    learning_rate = 5 * 1e-4
     warmup_epochs = max(1, nb_epochs//5)
     lr_scheduler = create_learning_rate_fn(nb_epochs, warmup_epochs, learning_rate, steps_per_epoch)
     optimizer = optax.adamw(lr_scheduler)

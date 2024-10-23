@@ -1,12 +1,38 @@
 from sklearn import metrics 
-import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 class Classification: 
 
-    def __init__(self, average='weighted'):
+    def __init__(self, average='weighted', titles=None):
         self.average = average
         self.lbls = []
         self.preds = []
+        self.titles = titles
 
+    def gen_heatmap(self):
+        # Create the heatmap
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(self.cm, annot=True, fmt="d", cmap="Blues", cbar=True, xticklabels=self.titles, yticklabels=self.titles)
+
+        # Label axes
+        plt.xlabel('Predicted Labels')
+        plt.ylabel('True Labels')
+        plt.title('Confusion Matrix')
+
+        # Save plot as image
+        plt.savefig("confusion_matrix.png")
+        plt.close()
+
+    def get_groundTruth(self):
+        return self.lbls
+        
+    def get_preds(self):
+        return self.preds
+
+    def get_titles(self):
+        return self.titles
+    
     def add_data(self, labels, preds): 
         self.lbls += labels
         self.preds += preds
