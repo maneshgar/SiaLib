@@ -7,23 +7,33 @@ from siamics.utils import futils
 
 class Data(Dataset):
 
-    def __init__(self, dataset, catalogue=None, relpath="", cohort=None, root=None, embed_name=None):
+    def __init__(self, dataset, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None):
         self.name = dataset
         self.embed_name = embed_name
 
+        # Wehter to use default root or given root. 
         if root: 
             self.root = root
         else: 
             self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
             self.root= os.path.join(self.datasets_path, dataset, relpath)
         
-        if catalogue is not None:
-            self.catalogue = catalogue.reset_index(drop=True)
-        else: 
+        # Wether to use default Catalogue or provided ones. 
+        if catalogue is None:
+            # Default catalogue
             try:
-                self.get_catalogue(types=cohort)
+                self.get_catalogue(types=cancer_types)
+                self.get_subsets(types=cancer_types)
             except:
                 print(f"Warning: {self.name} catalogue has not been generated yet!")
+
+        # If the path to the catalogue is provided
+        elif isinstance(catalogue, str):
+            self.get_catalogue(abs_path=catalogue, types=cancer_types)
+        # If the catalogue itself is provided. 
+        else: 
+            if cancer_types:
+                self.catalogue = catalogue[catalogue['subtype'].isin(cancer_types)].reset_index(drop=True)
 
     def __len__(self):
         return self.catalogue.shape[0]
@@ -48,7 +58,7 @@ class Data(Dataset):
 
         return data, metadata, idx
     
-    def collate_fn(self, batch):
+    def collate_fn(self, batch, num_devices=None):
         data = []
         metadata = []
         idx = []
@@ -56,6 +66,14 @@ class Data(Dataset):
             data.append(batch[i][0])
             metadata.append(batch[i][1])
             idx.append(batch[i][2])
+
+        # if number of devices is given, the batch will be padded to fit all devices. 
+        if num_devices:
+            while len(data) % num_devices != 0:
+                data.append(batch[0][0])
+                metadata.append(batch[0][1])
+                idx.append(-1)
+
         data_df = pd.concat(data)
         metadata = pd.concat(metadata)
         idx = jnp.array(idx)
@@ -85,13 +103,34 @@ class Data(Dataset):
         src = src.loc[:,~src.columns.duplicated()]
         return common_genes, src
 
-    def get_catalogue(self, types=None):
-        df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
+    def get_catalogue(self, abs_path=None, types=None):
+        if abs_path: 
+            df = self.load(abs_path=abs_path, sep=',', index_col=0)
+        else: 
+            df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
+        
         if types:
             df = df[df['subtype'].isin(types)]
             df = df.reset_index(drop=True)
+        
         self.catalogue = df
         return self.catalogue
+
+    def get_subsets(self, types=None):
+        df_train = self.load(rel_path='catalogue_train.csv', sep=',', index_col=0)
+        df_valid = self.load(rel_path='catalogue_valid.csv', sep=',', index_col=0)
+        df_test  = self.load(rel_path='catalogue_test.csv' , sep=',', index_col=0)
+        
+        if types:
+            df_train = df_train[df_train['subtype'].isin(types)].reset_index(drop=True)
+            df_valid = df_valid[df_valid['subtype'].isin(types)].reset_index(drop=True)
+            df_test  = df_test[df_test['subtype'].isin(types)].reset_index(drop=True)
+        
+        self.trainset = df_train
+        self.validset = df_valid
+        self.testset = df_test
+
+        return self.trainset, self.validset, self.testset
 
     def data_loader(self, batch_size, cohorts=None, shuffle=True, seed=0):
         data_ptrs = self.get_catalogue(cohorts)
@@ -110,8 +149,14 @@ class Data(Dataset):
             batch_id += 1
             yield batch_ptrs, batch_id
 
-    def load(self, rel_path, sep=',', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False, idx=None):
-        file_path = os.path.join(self.root, rel_path)
+    def load(self, rel_path=None, abs_path=None, sep=',', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False, idx=None):
+        if abs_path:
+            file_path = abs_path
+        elif rel_path:
+            file_path = os.path.join(self.root, rel_path)
+        else: 
+            raise ValueError
+        
         if verbos: print(f"Loading data: {file_path} ... ", end="")
         df = pd.read_csv(file_path, sep=sep, comment='#', index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows)
         if verbos: print("   Done!")

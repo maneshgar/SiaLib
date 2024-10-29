@@ -2,22 +2,23 @@ import os
 import pandas as pd
 from glob import glob
 import subprocess
+from sklearn.model_selection import GroupShuffleSplit
 
 from siamics.data import Data
-
 from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, cohort=None, root=None, embed_name=None):
+    def __init__(self, catalogue=None, cancer_types=None, root=None, embed_name=None, subset=None):
         self.geneID = "gene_id"
-        if cohort:
-            self.cohorts = cohort
+        
+        if cancer_types:
+            self.cancer_types = cancer_types
         else: 
-            self.cohorts= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
+            self.cancer_types= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
           'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM']
 
-        super().__init__("TCGA", catalogue, cohort=cohort, root=root, embed_name=embed_name)
+        super().__init__("TCGA", catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name)
 
     def _gen_catalogue(self, dirname, ext='.csv'):
         sub_list = [] 
@@ -43,6 +44,25 @@ class TCGA(Data):
         self.save(data=self.catalogue, rel_path='catalogue.csv')
         return self.catalogue
     
+    def _split_catalogue(self):
+        # Initial split for train and temp (temp will later be split into validation and test)
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.3, random_state=42)  # 70% train, 30% temp
+        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['subtype'].tolist(), groups=self.catalogue['patient_id'].tolist()))
+        tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
+        self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
+
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
+        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['subtype'].tolist(), groups=tempset['patient_id'].tolist()))
+
+        self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
+        self.testset = tempset.iloc[test_idx].reset_index(drop=True)
+
+        self.save(self.trainset, 'catalogue_train.csv')
+        self.save(self.validset, 'catalogue_valid.csv')
+        self.save(self.testset, 'catalogue_test.csv')
+        
+        return self.trainset, self.validset, self.testset
+    
     def _convert_to_ensg(self, df):
         df = df.T
         # drop NaNs - the geneIds that dont have EnsemblGeneID
@@ -54,9 +74,6 @@ class TCGA(Data):
         return df
 
     def get_embed_fname(self, path, fm_config_name=None):
-        # fname = 
-        #             # Save the data using pickle
-        #     # out_path = os.path.join(out_dir ,fm_model_name, cohort, pid, get_basename(sid)+".pkl")
         if self.embed_name:
             model_name = self.embed_name
         else: 
@@ -64,11 +81,13 @@ class TCGA(Data):
 
         return f'features/{model_name}/{path[5:-3]}pkl'
 
-    def load(self, rel_path, proc=False, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0, ext=None, idx=None):
-        if ext:
+    def load(self, rel_path=None, abs_path=None, proc=False, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0, ext=None, idx=None):
+        if rel_path is not None and ext:
             rel_path = rel_path + ext
-
-        df = super().load(rel_path, sep, index_col, usecols, nrows, skiprows)
+        if abs_path is not None and ext:
+            abs_path = abs_path + ext
+    
+        df = super().load(rel_path=rel_path, abs_path=abs_path, sep=sep, index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows)
         if proc:
             df = self._convert_to_ensg(df)        
         return df
@@ -77,7 +96,7 @@ class TCGA(Data):
         return super().save(data, rel_path, sep)
 
     def get_subtype_index(self, str_labels):
-        labels = [self.cohorts.index(l) for l in str_labels]
+        labels = [self.cancer_types.index(l) for l in str_labels]
         return labels
     
     # AIM function

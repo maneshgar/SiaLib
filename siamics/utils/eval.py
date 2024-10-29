@@ -47,5 +47,5 @@ class Classification:
     def print(self, update=True):
         if update: 
             self.update_metrics()
-        print(f"Classification Report: \n\n{self.report}")
-        print(f"Confusion Matrix: \n{self.cm}")
+        print(f"Classification Report: \n{self.titles}\n{self.report}")
+        print(f"Confusion Matrix: \n{self.titles}\n{self.cm}")
