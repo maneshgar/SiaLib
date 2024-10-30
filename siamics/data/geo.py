@@ -4,6 +4,7 @@ from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import logging
 import pandas as pd
+from sklearn.model_selection import GroupShuffleSplit
 
 from . import Data
 
@@ -45,6 +46,25 @@ class GEO(Data):
         # sort columns  
         return merged_df[merged_df.columns.sort_values()]
 
+    def _split_catalogue(self):
+        # Initial split for train and temp (temp will later be split into validation and test)
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.1, random_state=42)  # 70% train, 30% temp
+        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['subtype'].tolist(), groups=self.catalogue['group_id'].tolist()))
+        tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
+        self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
+
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
+        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['subtype'].tolist(), groups=tempset['group_id'].tolist()))
+
+        self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
+        self.testset = tempset.iloc[test_idx].reset_index(drop=True)
+
+        self.save(self.trainset, 'catalogue_train.csv')
+        self.save(self.validset, 'catalogue_valid.csv')
+        self.save(self.testset, 'catalogue_test.csv')
+        
+        return self.trainset, self.validset, self.testset
+        
     def get_ids_from_xml(self, file_path):
         # Load and parse the XML file
         tree = ET.parse(file_path)
@@ -54,14 +74,13 @@ class GEO(Data):
         ids = [id_elem.text for id_elem in root.find('IdList')]
         return ids
     
-    def load(self, rel_path, idx=None, sep='\t', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False, proc=True):
-        df = super().load(rel_path, sep, index_col, usecols, nrows, skiprows, verbos)   
+    def load(self, rel_path, idx=None, sep='\t', index_col=0, usecols=None, nrows=None, skiprows=0, verbos=False, proc=False):
+        df = super().load(rel_path=rel_path, sep=sep, index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows, verbos=verbos)   
         if idx:  
             df = df[self.catalogue.loc[idx, 'sample_id']]
         if proc: 
             df = self._convert_to_ensg(df)
         return df
-
 
     def load_by_UID(self, uid, sep="\t", index_col=0, usecols=None, nrows=None, skiprows=0, proc=True):
         gseID = "GSE" + str(int(str(uid)[3:]))

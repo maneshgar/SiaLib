@@ -30,10 +30,15 @@ class Data(Dataset):
         # If the path to the catalogue is provided
         elif isinstance(catalogue, str):
             self.get_catalogue(abs_path=catalogue, types=cancer_types)
+        
         # If the catalogue itself is provided. 
-        else: 
+        else:
             if cancer_types:
-                self.catalogue = catalogue[catalogue['subtype'].isin(cancer_types)].reset_index(drop=True)
+                self.catalogue = catalogue[catalogue['subtype'].isin(self.cancer_types)]
+            else: 
+                self.catalogue = catalogue
+
+        self.catalogue = self.catalogue.reset_index(drop=True)
 
     def __len__(self):
         return self.catalogue.shape[0]
@@ -116,11 +121,11 @@ class Data(Dataset):
         self.catalogue = df
         return self.catalogue
 
-    def get_subsets(self, types=None):
+    def get_subsets(self, types=None, ):
         df_train = self.load(rel_path='catalogue_train.csv', sep=',', index_col=0)
         df_valid = self.load(rel_path='catalogue_valid.csv', sep=',', index_col=0)
         df_test  = self.load(rel_path='catalogue_test.csv' , sep=',', index_col=0)
-        
+
         if types:
             df_train = df_train[df_train['subtype'].isin(types)].reset_index(drop=True)
             df_valid = df_valid[df_valid['subtype'].isin(types)].reset_index(drop=True)
