@@ -22,7 +22,7 @@ def list_files(root, pattern="*", extension=None, depth=1):
             
     return result
 
-def create_directories(fullpath):
+def create_directories(fullpath, is_dir=False):
     """
     Create all directories in the given path, excluding the filename, if they do not already exist.
     
@@ -32,17 +32,24 @@ def create_directories(fullpath):
     Returns:
     None
     """
-    try:
-        # Extract the directory part of the path
-        directory_path = os.path.dirname(fullpath)
-        
-        # os.makedirs creates all intermediate-level directories needed to contain the leaf directory
-        if directory_path:  # Ensure there's a directory path to create
-            os.makedirs(directory_path, exist_ok=True)
-        else:
-            print("No directory path to create.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    if is_dir:
+        try:            
+            # os.makedirs creates all intermediate-level directories needed to contain the leaf directory
+            os.makedirs(fullpath, exist_ok=True)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+    else: 
+        try:
+            # Extract the directory part of the path
+            directory_path = os.path.dirname(fullpath)
+            
+            # os.makedirs creates all intermediate-level directories needed to contain the leaf directory
+            if directory_path:  # Ensure there's a directory path to create
+                os.makedirs(directory_path, exist_ok=True)
+            else:
+                print("No directory path to create.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
 def get_basename(file_path, extention=False):
     """

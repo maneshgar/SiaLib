@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import logging
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
+from jax import numpy as jnp
 
 from . import Data
 
@@ -29,6 +30,39 @@ class GEO(Data):
         
         relpath = self.organisms_dir[self.organism]
         super().__init__("GEO", catalogue, relpath, root=root)
+
+    def __getitem__(self, idx):
+    
+        fname = self.catalogue.loc[idx, 'filename']
+        gsm = self.catalogue.loc[idx, 'sample_id']
+
+        # if embeddings are available
+        if self.embed_name:
+            epath = self.get_embed_fname(fname)
+            with open(os.path.join(self.root, epath), 'rb') as f:
+                data = pickle.load(f)
+        else:
+            # load the item and geneIDs
+            data = self.load(fname, usecols=[self.geneID, gsm], proc=True)
+
+        return data, None, idx
+        
+    def collate_fn(self, batch, num_devices=None):
+        data = []
+        idx = []
+        for i in range(len(batch)):
+            data.append(batch[i][0])
+            idx.append(batch[i][2])
+
+        # if number of devices is given, the batch will be padded to fit all devices. 
+        if num_devices:
+            while len(data) % num_devices != 0:
+                data.append(batch[0][0])
+                idx.append(-1)
+
+        data_df = pd.concat(data)
+        idx = jnp.array(idx)
+        return data_df, None, idx
 
     def _convert_to_ensg(self, df):
         reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')

@@ -1,4 +1,5 @@
 import optax, jax
+from jax import numpy as jnp
 
 def create_learning_rate_fn(num_epochs, warmup_epochs, base_learning_rate, steps_per_epoch):
   """Creates learning rate schedule."""
@@ -19,4 +20,7 @@ def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init=1e-3):
     
 # Function to accumulate gradients
 def sum_grads(grads_list):
-    return jax.tree_util.tree_map(lambda *grads: sum(grads), *grads_list)
+    return jax.tree_util.tree_map(lambda *grads: sum(grads), *grads_list)/len(grads_list)
+
+def count_jax_parameters(params):
+    return sum(jnp.size(p) for p in jax.tree_util.tree_leaves(params))
