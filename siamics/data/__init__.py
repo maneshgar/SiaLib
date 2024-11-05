@@ -51,7 +51,7 @@ class Data(Dataset):
                 data = pickle.load(f)
         else:
             # print(f'loading: {self.catalogue.loc[idx, "filename"]}')
-            data = self.load(self.catalogue.loc[idx, 'filename'], proc=True)
+            data = self.load(self.catalogue.loc[idx, 'filename'])
 
         # Getting label 
         try: 
