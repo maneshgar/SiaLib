@@ -10,6 +10,8 @@ class Data(Dataset):
     def __init__(self, dataset, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None):
         self.name = dataset
         self.embed_name = embed_name
+        self.cdata = {}
+        self.max_cache_size=0
 
         # Wehter to use default root or given root. 
         if root: 
@@ -34,7 +36,7 @@ class Data(Dataset):
         # If the catalogue itself is provided. 
         else:
             if cancer_types:
-                self.catalogue = catalogue[catalogue['subtype'].isin(self.cancer_types)]
+                self.catalogue = catalogue[catalogue['cancer_type'].isin(self.cancer_types)]
             else: 
                 self.catalogue = catalogue
 
@@ -51,12 +53,16 @@ class Data(Dataset):
                 data = pickle.load(f)
         else:
             # print(f'loading: {self.catalogue.loc[idx, "filename"]}')
-            data = self.load(self.catalogue.loc[idx, 'filename'])
+            file_path = self.catalogue.loc[idx, 'filename']
+            try: 
+                data = self.cdata[file_path]
+            except:
+                data = self.load_pickle(file_path)
 
         # Getting label 
         try: 
             metadata = self.catalogue.loc[idx:idx]
-            # metadata = self.catalogue.loc[idx, 'subtype']
+            # metadata = self.catalogue.loc[idx, 'cancer_type']
             # label = self.get_subtype_index(label)
         except: 
             metadata = None
@@ -81,7 +87,7 @@ class Data(Dataset):
 
         data_df = pd.concat(data)
         metadata = pd.concat(metadata)
-        idx = jnp.array(idx)
+        idx = np.array(idx)
         return data_df, metadata, idx
 
     def cache(self, cdata, path):
@@ -115,7 +121,7 @@ class Data(Dataset):
             df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
         
         if types:
-            df = df[df['subtype'].isin(types)]
+            df = df[df['cancer_type'].isin(types)]
             df = df.reset_index(drop=True)
         
         self.catalogue = df
@@ -127,9 +133,9 @@ class Data(Dataset):
         df_test  = self.load(rel_path='catalogue_test.csv' , sep=',', index_col=0)
 
         if types:
-            df_train = df_train[df_train['subtype'].isin(types)].reset_index(drop=True)
-            df_valid = df_valid[df_valid['subtype'].isin(types)].reset_index(drop=True)
-            df_test  = df_test[df_test['subtype'].isin(types)].reset_index(drop=True)
+            df_train = df_train[df_train['cancer_type'].isin(types)].reset_index(drop=True)
+            df_valid = df_valid[df_valid['cancer_types'].isin(types)].reset_index(drop=True)
+            df_test  = df_test[df_test['cancer_type'].isin(types)].reset_index(drop=True)
         
         self.trainset = df_train
         self.validset = df_valid
@@ -167,11 +173,34 @@ class Data(Dataset):
         if verbos: print("   Done!")
         return df
     
+    def load_pickle(self, rel_path=None, abs_path=None, verbos=False):
+        if abs_path:
+            file_path = abs_path
+
+        elif rel_path:
+            file_path = os.path.join(self.root, rel_path)
+
+        else: 
+            raise ValueError
+        
+        if verbos: print(f"Loading data: {file_path} ... ", end="")
+        df = pd.read_pickle(file_path,)
+        if verbos: print("   Done!")
+        return df
+
+
+
     def save(self, data, rel_path, sep=','):
         file_path = os.path.join(self.root, rel_path)
         print(f"Saving to file: {file_path}")
         futils.create_directories(file_path)
         data.to_csv(file_path, index=True, sep=sep)
+    
+    def to_pickle(self, data, rel_path):
+        file_path = os.path.join(self.root, rel_path)
+        print(f"Saving to file: {file_path}")
+        futils.create_directories(file_path)
+        data.to_pickle(file_path)
 
     def load_batch(self, filenames):
         df_lists = []

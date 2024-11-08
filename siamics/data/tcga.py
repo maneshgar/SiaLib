@@ -47,12 +47,12 @@ class TCGA(Data):
     def _split_catalogue(self):
         # Initial split for train and temp (temp will later be split into validation and test)
         gss = GroupShuffleSplit(n_splits=1, test_size=0.3, random_state=42)  # 70% train, 30% temp
-        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['subtype'].tolist(), groups=self.catalogue['patient_id'].tolist()))
+        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['cancer_type'].tolist(), groups=self.catalogue['patient_id'].tolist()))
         tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
         self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
 
         gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
-        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['subtype'].tolist(), groups=tempset['patient_id'].tolist()))
+        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['cancer_type'].tolist(), groups=tempset['patient_id'].tolist()))
 
         self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
         self.testset = tempset.iloc[test_idx].reset_index(drop=True)
@@ -81,13 +81,13 @@ class TCGA(Data):
 
         return f'features/{model_name}/{path[5:-3]}pkl'
 
-    def load(self, rel_path=None, abs_path=None, proc=False, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0, ext=None, idx=None):
+    def load(self, rel_path=None, abs_path=None, proc=False, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0, ext=None, idx=None, verbos=False):
         if rel_path is not None and ext:
             rel_path = rel_path + ext
         if abs_path is not None and ext:
             abs_path = abs_path + ext
     
-        df = super().load(rel_path=rel_path, abs_path=abs_path, sep=sep, index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows)
+        df = super().load(rel_path=rel_path, abs_path=abs_path, sep=sep, index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows, verbos=verbos)
         if proc:
             df = self._convert_to_ensg(df)        
         return df
@@ -129,7 +129,7 @@ class TCGA(Data):
             df = self.load(inp_path, proc=True, usecols=[self.geneID, "tpm_unstranded"], sep="\t").astype(str)
             df.index = batch['sample_id']
 
-            out_path = os.path.join(data_dir, batch.loc[batch.index[0], 'subtype'], batch.loc[batch.index[0], 'group_id'], batch.loc[batch.index[0] ,'sample_id']+'.csv')
+            out_path = os.path.join(data_dir, batch.loc[batch.index[0], 'cancer_type'], batch.loc[batch.index[0], 'group_id'], batch.loc[batch.index[0] ,'sample_id']+'.csv')
             futils.create_directories(out_path)
             self.save(df, out_path)
         return 
