@@ -1,13 +1,14 @@
 import requests
-import os
+import os, pickle
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import logging
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
-from jax import numpy as jnp
+import numpy as np
 
 from . import Data
+from . import futils
 
 class GEO(Data):
 
@@ -32,18 +33,35 @@ class GEO(Data):
         super().__init__("GEO", catalogue, relpath, root=root)
 
     def __getitem__(self, idx):
-    
-        fname = self.catalogue.loc[idx, 'filename']
-        gsm = self.catalogue.loc[idx, 'sample_id']
+        pkl_name = self.catalogue.loc[idx, 'filename']
 
         # if embeddings are available
         if self.embed_name:
-            epath = self.get_embed_fname(fname)
+            epath = self.get_embed_fname(pkl_name)
             with open(os.path.join(self.root, epath), 'rb') as f:
                 data = pickle.load(f)
         else:
             # load the item and geneIDs
-            data = self.load(fname, usecols=[self.geneID, gsm], proc=True)
+            try: 
+                data = self.load_pickle(pkl_name)
+            except: 
+                gsm = pkl_name.split(sep="/")[3][:-4]
+                new_filename=os.path.join(pkl_name.split(sep="/")[1], pkl_name.split(sep="/")[2]+".tsv.gz")
+                data = self.load(new_filename, usecols=[self.geneID, gsm], proc=True)
+                futils.create_directories(new_filename)
+                print(f"Saving:: {pkl_name}")
+                data.to_pickle(os.path.join(self.root, pkl_name))
+
+            # try: 
+            #     new_filename=os.path.join(self.root, "data", fname[:-7], f"{gsm}.pkl")
+            #     data = self.load_pickle(fname)
+            #     print(f"Loading:: {new_filename}! pickle found")
+
+            # except: 
+            #     data = self.load(fname, usecols=[self.geneID, gsm], proc=True)
+            #     futils.create_directories(new_filename)
+            #     print(f"Saving:: {new_filename}")
+            #     data.to_pickle(new_filename)
 
         return data, None, idx
         
@@ -61,7 +79,7 @@ class GEO(Data):
                 idx.append(-1)
 
         data_df = pd.concat(data)
-        idx = jnp.array(idx)
+        idx = np.array(idx)
         return data_df, None, idx
 
     def _convert_to_ensg(self, df):

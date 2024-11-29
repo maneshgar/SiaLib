@@ -39,8 +39,8 @@ class Classification:
         
     def update_metrics(self):
         self.accuracy   = metrics.accuracy_score       (self.lbls, self.preds)
-        self.precision  = metrics.precision_score      (self.lbls, self.preds, average=self.average)
-        self.recall     = metrics.recall_score         (self.lbls, self.preds, average=self.average)
+        self.precision  = metrics.precision_score      (self.lbls, self.preds, average=self.average, zero_division=0)
+        self.recall     = metrics.recall_score         (self.lbls, self.preds, average=self.average, zero_division=0)
         self.cm         = metrics.confusion_matrix     (self.lbls, self.preds)
         self.report     = metrics.classification_report(self.lbls, self.preds)
         

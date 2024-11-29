@@ -4,7 +4,7 @@ from jax import numpy as jnp
 def create_learning_rate_fn(num_epochs, warmup_epochs, base_learning_rate, steps_per_epoch):
   """Creates learning rate schedule."""
   cosine_alpha =  0.1
-  warmup_steps = min(1000, warmup_epochs*steps_per_epoch)
+  warmup_steps = warmup_epochs*steps_per_epoch
   warmup_fn = optax.linear_schedule(init_value=0.00001, end_value=base_learning_rate, transition_steps=warmup_steps)
   cosine_epochs = max(num_epochs - warmup_epochs, 1)
   cosine_fn = optax.cosine_decay_schedule(init_value=base_learning_rate, decay_steps=cosine_epochs * steps_per_epoch, alpha=cosine_alpha)
