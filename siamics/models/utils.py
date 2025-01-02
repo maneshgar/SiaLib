@@ -1,7 +1,7 @@
 import optax, jax
 from jax import numpy as jnp
 
-def create_learning_rate_fn(num_epochs, warmup_epochs, base_learning_rate, steps_per_epoch):
+def create_cosine_lr_fn(num_epochs, warmup_epochs, base_learning_rate, steps_per_epoch):
   """Creates learning rate schedule."""
   cosine_alpha =  0.1
   warmup_steps = warmup_epochs*steps_per_epoch
@@ -11,13 +11,31 @@ def create_learning_rate_fn(num_epochs, warmup_epochs, base_learning_rate, steps
   schedule_fn = optax.join_schedules(schedules=[warmup_fn, cosine_fn], boundaries=[warmup_epochs * steps_per_epoch])
   return schedule_fn
 
+def create_const_lr_fn(num_epochs, warmup_epochs, base_learning_rate, steps_per_epoch):
+  """Creates learning rate schedule."""
+  warmup_steps = warmup_epochs * steps_per_epoch
+  warmup_fn = optax.linear_schedule(init_value=0.0000001, end_value=base_learning_rate, transition_steps=warmup_steps)
+  const_fn = optax.constant_schedule(value=base_learning_rate)
+  schedule_fn = optax.join_schedules(schedules=[warmup_fn, const_fn], boundaries=[warmup_steps])
+  return schedule_fn
 
 # Initialize optimizer state
-def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init=5*1e-4):
+def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_type, clip_norm=1e2):
     # Optimizer setup
     warmup_epochs = max(1, nb_epochs//10)
-    lr_scheduler = create_learning_rate_fn(nb_epochs, warmup_epochs, lr_init, steps_per_epoch)
-    optimizer = optax.adamw(lr_scheduler)
+    
+    if scheduler_type == 'cosine':
+        lr_scheduler = create_cosine_lr_fn(nb_epochs, warmup_epochs, lr_init, steps_per_epoch)
+    elif scheduler_type == 'const':
+        lr_scheduler = create_const_lr_fn(nb_epochs, warmup_epochs, lr_init, steps_per_epoch)
+    else:
+        raise ValueError(f"Invalid scheduler type: {scheduler_type}")
+    
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(clip_norm),  # Clip gradients to a maximum global norm of 1.0
+        optax.adamw(lr_scheduler)
+        )
+    
     return optimizer, optimizer.init(params), lr_scheduler
     
 # Function to accumulate gradients

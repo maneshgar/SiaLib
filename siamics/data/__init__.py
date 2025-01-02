@@ -184,7 +184,7 @@ class Data(Dataset):
             raise ValueError
         
         if verbos: print(f"Loading data: {file_path} ... ", end="")
-        df = pd.read_pickle(file_path,)
+        df = pd.read_pickle(file_path)
         if verbos: print("   Done!")
         return df
 
