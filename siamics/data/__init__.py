@@ -24,21 +24,23 @@ class Data(Dataset):
             try:
                 self.get_catalogue(types=cancer_types)
                 self.get_subsets(types=cancer_types)
+                self.catalogue = self.catalogue.reset_index(drop=True)
+
             except:
                 print(f"Warning: {self.name} catalogue has not been generated yet!")
 
         # If the path to the catalogue is provided
         elif isinstance(catalogue, str):
             self.get_catalogue(abs_path=catalogue, types=cancer_types)
-        
+            self.catalogue = self.catalogue.reset_index(drop=True)
+
         # If the catalogue itself is provided. 
         else:
             if cancer_types:
                 self.catalogue = catalogue[catalogue['cancer_type'].isin(self.cancer_types)]
             else: 
                 self.catalogue = catalogue
-
-        self.catalogue = self.catalogue.reset_index(drop=True)
+            self.catalogue = self.catalogue.reset_index(drop=True)
 
     def __len__(self):
         return self.catalogue.shape[0]
@@ -105,9 +107,6 @@ class Data(Dataset):
         
         return self.trainset, self.validset, self.testset
         
-    def get_subtype_index(self):
-        raise NotImplemented
-    
     def get_gene_id(self):
        return self.geneID
     
@@ -119,8 +118,10 @@ class Data(Dataset):
 
         if keep_duplicates:
             return common_genes, src
-            
-        src = src.loc[:,~src.columns.duplicated()]
+
+        src = src[common_genes]
+        src = src.loc[:,~src.columns.duplicated()].reset_index(drop=True)
+
         return common_genes, src
 
     def get_catalogue(self, abs_path=None, types=None):
@@ -293,6 +294,23 @@ class DataWrapper(Dataset):
         
         return data_df, None, idx
     
+    # Just call the get_common_genes method of the first dataset in the list.
     def get_common_genes(self, src, dst, ignore_subids=True, keep_duplicates=False):
         common_genes, src = self.dataset_objs[0].get_common_genes(src, dst, ignore_subids, keep_duplicates)
         return common_genes, src
+
+    def gen_common_genes_sample_file(self, out_path=None):
+        samples = []
+        for dataset in self.dataset_objs:
+            samples.append(dataset.load_pickle(dataset.catalogue.iloc[0]['filename']))
+
+        dt = self.dataset_objs[0]
+
+        sample_file = samples[0]
+        for sample in samples[1:]:
+            common_genes, sample_file = dt.get_common_genes(sample_file, sample)
+            
+        if out_path:
+            dt.save(sample_file, out_path)
+        
+        return common_genes, sample_file

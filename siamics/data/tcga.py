@@ -113,7 +113,7 @@ class TCGA(Data):
                 file_s = file.split("/TCGA/")[1]
                 group_id = file_s.split("/")[2] 
                 sample_id = file_s.split("/")[5]
-                bname = futils.get_basename(file, extention=True)
+                bname = futils.get_basename(file, extension=True)
                 dest = os.path.join(self.root, 'raw_data', types_names[ind], group_id, sample_id, bname)
                 futils.create_directories(dest)
                 command = f"cp '{file}' '{dest}'"

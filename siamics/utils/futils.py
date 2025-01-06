@@ -51,7 +51,7 @@ def create_directories(fullpath, is_dir=False):
         except Exception as e:
             print(f"An error occurred: {e}")
 
-def get_basename(file_path, extention=False):
+def get_basename(file_path, extension=False):
     """
     Get the file name without the extension from a full file path.
 
@@ -63,7 +63,7 @@ def get_basename(file_path, extention=False):
     """
     # Get the base name (file name with extension)
     base_name = os.path.basename(file_path)
-    if extention: 
+    if extension: 
         return base_name
     # Split the base name into name and extension
     base_name, _ = os.path.splitext(base_name)
