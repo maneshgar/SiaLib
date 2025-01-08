@@ -4,7 +4,7 @@ import seaborn as sns
 
 class Classification: 
 
-    def __init__(self, average='weighted', titles=None):
+    def __init__(self, average='binary', titles=None):
         self.average = average
         self.lbls = []
         self.preds = []
@@ -44,6 +44,46 @@ class Classification:
         self.cm         = metrics.confusion_matrix     (self.lbls, self.preds)
         self.report     = metrics.classification_report(self.lbls, self.preds)
         
+    def print(self, update=True):
+        if update: 
+            self.update_metrics()
+        print(f"Classification Report: \n{self.titles}\n{self.report}")
+        print(f"Confusion Matrix: \n{self.titles}\n{self.cm}")
+
+class ClassificationOnTheFly:
+    def __init__(self, average='binary'):
+        self.average = average
+        self.titles = []
+        self.total_samples = 0
+        self.correct_predictions = 0
+        self.tp = 0
+        self.fp = 0
+        self.fn = 0
+        self.tn = 0
+
+    def get_titles(self):
+        return self.titles
+    
+    def add_data(self, labels, preds): 
+        self.total_samples += len(labels)
+        self.correct_predictions += sum([1 for l, p in zip(labels, preds) if l == p])
+        for l, p in zip(labels, preds):
+            if l == p == 1:
+                self.tp += 1
+            elif l == 0 and p == 1:
+                self.fp += 1
+            elif l == 1 and p == 0:
+                self.fn += 1
+            elif l == p == 0:
+                self.tn += 1
+
+    def update_metrics(self):
+        self.accuracy = self.correct_predictions / self.total_samples
+        self.precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
+        self.recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
+        self.cm = [[self.tn, self.fp], [self.fn, self.tp]]
+        self.report = f"Accuracy: {self.accuracy}\nPrecision: {self.precision}\nRecall: {self.recall}"
+
     def print(self, update=True):
         if update: 
             self.update_metrics()

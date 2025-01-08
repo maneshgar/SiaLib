@@ -13,7 +13,7 @@ class Data(Dataset):
 
         # Wehter to use default root or given root. 
         if root: 
-            self.root = root
+            self.root = os.path.join(root, dataset)
         else: 
             self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
             self.root= os.path.join(self.datasets_path, dataset, relpath)
@@ -66,26 +66,27 @@ class Data(Dataset):
 
         return data, metadata, idx
     
-    def collate_fn(self, batch, num_devices=None):
+    def collate_fn(self, batch, num_devices=None, metadata=False):
+        meta = None
         data = []
-        metadata = []
+        if metadata: meta = []
         idx = []
         for i in range(len(batch)):
             data.append(batch[i][0])
-            metadata.append(batch[i][1])
+            if metadata: meta.append(batch[i][1])
             idx.append(batch[i][2])
 
         # if number of devices is given, the batch will be padded to fit all devices. 
         if num_devices:
             while len(data) % num_devices != 0:
                 data.append(batch[0][0])
-                metadata.append(batch[0][1])
+                if metadata: meta.append(batch[0][1])
                 idx.append(-1)
 
         data_df = pd.concat(data)
-        metadata = pd.concat(metadata)
+        if metadata: meta = pd.concat(meta)
         idx = np.array(idx)
-        return data_df, metadata, idx
+        return data_df, meta, idx
 
     def _gen_catalogue(self):
         raise NotImplementedError
@@ -198,11 +199,11 @@ class Data(Dataset):
         if verbos: print("   Done!")
         return df
 
-    def save(self, data, rel_path, sep=','):
+    def save(self, data, rel_path, sep=',', index=True):
         file_path = os.path.join(self.root, rel_path)
         print(f"Saving to file: {file_path}")
         futils.create_directories(file_path)
-        data.to_csv(file_path, index=True, sep=sep)
+        data.to_csv(file_path, index=index, sep=sep)
     
     def to_pickle(self, data, rel_path):
         file_path = os.path.join(self.root, rel_path)
@@ -272,28 +273,28 @@ class DataWrapper(Dataset):
         # Return the sample from the appropriate dataset
         return self.datasets[dataset_idx][sample_idx]
 
-    def collate_fn(self, batch, num_devices=None):
-        # Initialize lists to store data and indices
+    def collate_fn(self, batch, num_devices=None, metadata=False):
+        meta = None
         data = []
+        if metadata: meta = []
         idx = []
-        
-        # Iterate over the batch and collect data and indices
         for i in range(len(batch)):
             data.append(batch[i][0])
+            if metadata: meta.append(batch[i][1])
             idx.append(batch[i][2])
 
-        # If number of devices is given, pad the batch to fit all devices
+        # if number of devices is given, the batch will be padded to fit all devices. 
         if num_devices:
             while len(data) % num_devices != 0:
                 data.append(batch[0][0])
+                if metadata: meta.append(batch[0][1])
                 idx.append(-1)
 
-        # Concatenate data and convert indices to numpy array
         data_df = pd.concat(data)
+        if metadata: meta = pd.concat(meta)
         idx = np.array(idx)
-        
-        return data_df, None, idx
-    
+        return data_df, meta, idx
+
     # Just call the get_common_genes method of the first dataset in the list.
     def get_common_genes(self, src, dst, ignore_subids=True, keep_duplicates=False):
         common_genes, src = self.dataset_objs[0].get_common_genes(src, dst, ignore_subids, keep_duplicates)
@@ -309,8 +310,9 @@ class DataWrapper(Dataset):
         sample_file = samples[0]
         for sample in samples[1:]:
             common_genes, sample_file = dt.get_common_genes(sample_file, sample)
-            
-        if out_path:
-            dt.save(sample_file, out_path)
         
+        if out_path:
+            dt.save(sample_file, out_path, index=False)
+        
+        print(f"Common genes: {len(common_genes)}")
         return common_genes, sample_file
