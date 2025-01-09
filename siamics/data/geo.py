@@ -12,7 +12,7 @@ from . import futils
 
 class GEO(Data):
 
-    def __init__(self, catalogue=None, organism="HomoSapien", dataType='TPM', root=None):
+    def __init__(self, catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
         self.geneID = 'GeneID'
 
         self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
@@ -30,7 +30,7 @@ class GEO(Data):
         else: raise ValueError
         
         relpath = self.organisms_dir[self.organism]
-        super().__init__("GEO", catalogue, relpath, root=root)
+        super().__init__("GEO", catalogue, relpath, root=root, augment=augment)
 
     def __getitem__(self, idx):
         pkl_name = self.catalogue.loc[idx, 'filename']

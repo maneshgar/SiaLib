@@ -4,7 +4,7 @@ import seaborn as sns
 
 class Classification: 
 
-    def __init__(self, average='binary', titles=None):
+    def __init__(self, average='weighted', titles=None):
         self.average = average
         self.lbls = []
         self.preds = []
@@ -51,7 +51,7 @@ class Classification:
         print(f"Confusion Matrix: \n{self.titles}\n{self.cm}")
 
 class ClassificationOnTheFly:
-    def __init__(self, average='binary'):
+    def __init__(self, average='weighted'):
         self.average = average
         self.titles = []
         self.total_samples = 0
@@ -78,12 +78,20 @@ class ClassificationOnTheFly:
                 self.tn += 1
 
     def update_metrics(self):
-        self.accuracy = self.correct_predictions / self.total_samples
-        self.precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
-        self.recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
-        self.cm = [[self.tn, self.fp], [self.fn, self.tp]]
-        self.report = f"Accuracy: {self.accuracy}\nPrecision: {self.precision}\nRecall: {self.recall}"
-
+        try:
+            self.accuracy = self.correct_predictions / self.total_samples
+            self.precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
+            self.recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
+            self.cm = [[self.tn, self.fp], [self.fn, self.tp]]
+            self.report = f"Accuracy: {self.accuracy}\nPrecision: {self.precision}\nRecall: {self.recall}"
+        except ZeroDivisionError:
+            print("Warning: ZeroDivisionError occurred while updating metrics.")
+            self.accuracy = 0
+            self.precision = 0
+            self.recall = 0
+            self.cm = [[0, 0], [0, 0]]
+            self.report = "Accuracy: 0\nPrecision: 0\nRecall: 0"
+            
     def print(self, update=True):
         if update: 
             self.update_metrics()

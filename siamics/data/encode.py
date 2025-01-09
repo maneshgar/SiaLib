@@ -6,8 +6,8 @@ from ..utils import futils
 
 class ENCODE(Data):
     
-    def __init__(self, catalogue=None, root=None):
-        super().__init__("ENCODE", catalogue=catalogue, root=root)
+    def __init__(self, catalogue=None, root=None, augment=False):
+        super().__init__("ENCODE", catalogue=catalogue, root=root, augment=augment)
 
     def convert_tsv_files_to_pickle(self, tsv_dir, pkl_dir):
         tsv_dir = os.path.join(self.root, tsv_dir)

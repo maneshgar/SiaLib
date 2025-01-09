@@ -9,7 +9,7 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, cancer_types=None, root=None, embed_name=None, subset=None):
+    def __init__(self, catalogue=None, cancer_types=None, root=None, embed_name=None, augment=False):
         self.geneID = "gene_id"
         
         if cancer_types:
@@ -18,7 +18,7 @@ class TCGA(Data):
             self.cancer_types= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
           'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM']
 
-        super().__init__("TCGA", catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name)
+        super().__init__("TCGA", catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self, dirname, ext='.csv'):
         sub_list = [] 

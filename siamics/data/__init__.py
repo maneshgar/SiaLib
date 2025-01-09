@@ -7,9 +7,10 @@ from sklearn.model_selection import train_test_split
 
 class Data(Dataset):
 
-    def __init__(self, dataset, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None):
+    def __init__(self, dataset, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None, augment=False):
         self.name = dataset
         self.embed_name = embed_name
+        self.augment = augment
 
         # Wehter to use default root or given root. 
         if root: 
@@ -55,6 +56,10 @@ class Data(Dataset):
             # print(f'loading: {self.catalogue.loc[idx, "filename"]}')
             file_path = self.catalogue.loc[idx, 'filename']
             data = self.load_pickle(file_path)
+            if self.augment and np.random.rand() < 0.5:
+                print(f"Augmenting data Before: {data.columns}")
+                data = data.sample(frac=1, axis=1).reset_index(drop=True)
+                print(f"After: {data.columns}")
 
         # Getting label 
         try: 
@@ -63,7 +68,7 @@ class Data(Dataset):
             # label = self.get_subtype_index(label)
         except: 
             metadata = None
-
+        
         return data, metadata, idx
     
     def collate_fn(self, batch, num_devices=None, metadata=False):
@@ -218,7 +223,7 @@ class Data(Dataset):
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, root=None):
+    def __init__(self, datasets, subset, root=None, augment=False):
         """
         Initialize the DataWrapper with a list of datasets.
         
@@ -226,7 +231,7 @@ class DataWrapper(Dataset):
             datasets (list): List of datasets to be wrapped.
         """
         self.datasets_cls = datasets # GTEX, TCGA, etc.
-        self.dataset_objs = [dataset(root=root) for dataset in self.datasets_cls]
+        self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
         if subset == 'full':
             self.datasets = [self.datasets_cls[index](dataset.catalogue, root=root) for index, dataset in enumerate(self.dataset_objs)]
@@ -241,6 +246,7 @@ class DataWrapper(Dataset):
 
         self.lengths = [len(dataset) for dataset in self.datasets]
         self.cumulative_lengths = np.cumsum(self.lengths)
+        self.augment = augment
 
     def __len__(self):
         """
