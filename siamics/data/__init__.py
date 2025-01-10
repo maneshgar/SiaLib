@@ -5,6 +5,21 @@ from torch.utils.data import Dataset
 from siamics.utils import futils
 from sklearn.model_selection import train_test_split
 
+def get_common_genes(reference_data, target_data, ignore_subids=True, keep_duplicates=False):
+    if ignore_subids:
+        reference_data.columns = [item.split(".")[0] for item in reference_data.columns]
+        target_data.columns = [item.split(".")[0] for item in target_data.columns]
+    common_genes = reference_data.columns.intersection(target_data.columns)  # Find common genes
+
+    if keep_duplicates:
+        return common_genes, target_data
+
+    target_data = target_data.loc[:,~target_data.columns.duplicated()].reset_index(drop=True)
+    target_data = target_data[common_genes]
+
+    return common_genes, target_data
+
+
 class Data(Dataset):
 
     def __init__(self, dataset, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None, augment=False):
@@ -116,20 +131,6 @@ class Data(Dataset):
     def get_gene_id(self):
        return self.geneID
     
-    def get_common_genes(self, src, dst, ignore_subids=True, keep_duplicates=False):
-        if ignore_subids:
-            src.columns = [item.split(".")[0] for item in src.columns]
-            dst.columns = [item.split(".")[0] for item in dst.columns]
-        common_genes = src.columns.intersection(dst.columns)  # Find common genes
-
-        if keep_duplicates:
-            return common_genes, src
-
-        src = src[common_genes]
-        src = src.loc[:,~src.columns.duplicated()].reset_index(drop=True)
-
-        return common_genes, src
-
     def get_catalogue(self, abs_path=None, types=None):
         if abs_path: 
             df = self.load(abs_path=abs_path, sep=',', index_col=0)
@@ -159,8 +160,8 @@ class Data(Dataset):
 
         return self.trainset, self.validset, self.testset
 
-    def data_loader(self, batch_size, cohorts=None, shuffle=True, seed=0):
-        data_ptrs = self.get_catalogue(cohorts)
+    def data_loader(self, batch_size, cancer_types=None, shuffle=True, seed=0):
+        data_ptrs = self.get_catalogue(types=cancer_types)
         data_size = data_ptrs.shape[0]
         indices = np.arange(data_size)
 
@@ -219,7 +220,7 @@ class Data(Dataset):
     def load_batch(self, filenames):
         df_lists = []
         for file in filenames:
-            df_lists.append(self.load(file))
+            df_lists.append(self.load_pickle(file))
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
@@ -300,11 +301,6 @@ class DataWrapper(Dataset):
         if metadata: meta = pd.concat(meta)
         idx = np.array(idx)
         return data_df, meta, idx
-
-    # Just call the get_common_genes method of the first dataset in the list.
-    def get_common_genes(self, src, dst, ignore_subids=True, keep_duplicates=False):
-        common_genes, src = self.dataset_objs[0].get_common_genes(src, dst, ignore_subids, keep_duplicates)
-        return common_genes, src
 
     def gen_common_genes_sample_file(self, out_path=None):
         samples = []

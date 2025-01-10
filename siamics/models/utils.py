@@ -27,7 +27,7 @@ def create_const_lr_fn(num_epochs, warmup_epochs, base_learning_rate, steps_per_
 # Initialize optimizer state
 def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_type, clip_norm=1e2):
     # Optimizer setup
-    warmup_epochs = max(1, nb_epochs//10)
+    warmup_epochs = max(1, nb_epochs//5)
     
     if scheduler_type == 'cosine':
         lr_scheduler = create_cosine_lr_fn(nb_epochs, warmup_epochs, lr_init, steps_per_epoch)
