@@ -1,4 +1,5 @@
 import umap
+import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
 from siamics.utils.futils import create_directories
@@ -37,17 +38,22 @@ def plot_umap(
     umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components, metric=metric, **kwargs)
     umap_embedding = umap_model.fit_transform(data)
 
-    # Define a mapping from labels to colors
-    unique_labels = list(set(labels))
-    label_to_color = {label: color for label, color in zip(unique_labels, plt.cm.tab20.colors)}
-
-    # Map the labels to colors
-    colors = [label_to_color[label] for label in labels]
-
     # Step 2: Create the plot
     plt.figure(figsize=(8, 6))
     scatter_args = {'s': 10, 'alpha': 0.7}  # Default scatter plot settings
-    if colors is not None:
+    plt.title('UMAP Projection')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(True)
+
+    if labels:
+        # Define a mapping from labels to colors
+        unique_labels = list(set(labels))
+        label_to_color = {label: color for label, color in zip(unique_labels, plt.cm.tab20.colors)}
+
+        # Map the labels to colors
+        colors = [label_to_color[label] for label in labels]
+
         scatter = plt.scatter(
             umap_embedding[:, 0], 
             umap_embedding[:, 1], 
@@ -55,13 +61,10 @@ def plot_umap(
             **scatter_args
         )
         plt.colorbar(scatter, label='Labels')
+
     else:
         plt.scatter(umap_embedding[:, 0], umap_embedding[:, 1], **scatter_args)
         
-    plt.title('UMAP Projection')
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True)
 
     # Step 3: Save the plot to disk if save_path is specified
     if save_path:
@@ -81,3 +84,13 @@ def plot_umap(
 
     # Return the in-memory image if requested
     return image_buffer
+
+def plot_hist(data):
+    # Plot histogram
+    plt.figure(figsize=(10, 5))
+    plt.hist(data, bins=66, range=(0, 65), alpha=0.75, color='b', edgecolor='black')
+    plt.xlabel("Bin Index")
+    plt.ylabel("Frequency")
+    plt.title("Histogram of Binned Token Frequencies")
+    plt.xticks(np.arange(0, 65, step=5))  # Adjust ticks for readability
+    plt.savefig("plt.png")

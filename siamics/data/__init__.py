@@ -19,6 +19,13 @@ def get_common_genes(reference_data, target_data, ignore_subids=True, keep_dupli
 
     return common_genes, target_data
 
+def pad_dataframe(reference_data, target_data, pad_token=0):
+
+    missing_cols = set(reference_data.columns) - set(target_data.columns)
+    for col in missing_cols:
+        target_data[col] = pad_token
+    target_data = target_data[reference_data.columns]
+    return target_data
 
 class Data(Dataset):
 
@@ -84,6 +91,7 @@ class Data(Dataset):
         except: 
             metadata = None
         
+        # print(data)
         return data, metadata, idx
     
     def collate_fn(self, batch, num_devices=None, metadata=False):
@@ -111,9 +119,9 @@ class Data(Dataset):
     def _gen_catalogue(self):
         raise NotImplementedError
 
-    def _split_catalogue(self):
+    def _split_catalogue(self, test_size=0.3):
         # Split data into 70% train and 30% temp
-        trainset, temp = train_test_split(self.catalogue, test_size=0.3, random_state=42)
+        trainset, temp = train_test_split(self.catalogue, test_size=test_size, random_state=42)
 
         # Split the remaining 30% into 15% valid and 15% test
         validset, testset = train_test_split(temp, test_size=0.5, random_state=42)

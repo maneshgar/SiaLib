@@ -13,10 +13,12 @@ class TCGA(Data):
         self.geneID = "gene_id"
         
         if cancer_types:
-            self.cancer_types = cancer_types
+            self.cancer_types = [item for sublist in cancer_types for item in (sublist if isinstance(sublist, list) else [sublist])]
+            self.classes = cancer_types
         else: 
             self.cancer_types= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
           'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM']
+            self.classes = len(self.cancer_types)
 
         super().__init__("TCGA", catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment)
 
@@ -96,7 +98,14 @@ class TCGA(Data):
         return super().save(data, rel_path, sep)
 
     def get_subtype_index(self, str_labels):
-        labels = [self.cancer_types.index(l) for l in str_labels]
+        labels = []
+        for lbl in str_labels: 
+            for idx, item in enumerate(self.classes):
+                if isinstance(item, list):  # If it's a nested list like ['BRCA', ['GBM', 'LGG'], 'LUAD', 'UCEC']
+                    if lbl in item: labels.append(idx)
+                else:
+                    if lbl == item: labels.append(idx)
+
         return labels
     
     # AIM function
