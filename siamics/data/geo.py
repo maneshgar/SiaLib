@@ -1,5 +1,5 @@
 import requests
-import os, pickle
+import os, pickle, re
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import logging
@@ -9,6 +9,7 @@ import numpy as np
 
 from . import Data
 from . import futils
+from concurrent.futures import ThreadPoolExecutor
 
 class GEO(Data):
 
@@ -16,7 +17,7 @@ class GEO(Data):
         self.geneID = 'GeneID'
 
         self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
-                             'MusMusculus': 'rna_seq_MusMusculus'}
+                            'MusMusculus': 'rna_seq_MusMusculus'}
         
         self.type_suffix={'RAW':'_raw_counts_GRCh38.p13_NCBI.tsv.gz',
                           'TPM':'_norm_counts_TPM_GRCh38.p13_NCBI.tsv.gz',
@@ -30,7 +31,7 @@ class GEO(Data):
         else: raise ValueError
         
         relpath = self.organisms_dir[self.organism]
-        super().__init__("GEO", catalogue, relpath, root=root, augment=augment)
+        super().__init__("GEO", catalogue, relpath=relpath, root=root, augment=augment)
 
     def __getitem__(self, idx):
         pkl_name = self.catalogue.loc[idx, 'filename']
@@ -84,12 +85,12 @@ class GEO(Data):
     def _split_catalogue(self):
         # Initial split for train and temp (temp will later be split into validation and test)
         gss = GroupShuffleSplit(n_splits=1, test_size=0.1, random_state=42)  # 70% train, 30% temp
-        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['subtype'].tolist(), groups=self.catalogue['group_id'].tolist()))
+        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['cancer_type'].tolist(), groups=self.catalogue['group_id'].tolist()))
         tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
         self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
 
         gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
-        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['subtype'].tolist(), groups=tempset['group_id'].tolist()))
+        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['cancer_type'].tolist(), groups=tempset['group_id'].tolist()))
 
         self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
         self.testset = tempset.iloc[test_idx].reset_index(drop=True)
@@ -120,12 +121,12 @@ class GEO(Data):
     def load_by_UID(self, uid, sep="\t", index_col=0, usecols=None, nrows=None, skiprows=0, proc=True):
         gseID = "GSE" + str(int(str(uid)[3:]))
         rel_path=os.path.join(uid, (gseID+self.type_suffix[self.dataType]))
-        self.df = super().load(rel_path, sep, index_col, usecols, nrows, skiprows)
+        self.df = super().load(rel_path=rel_path, sep=sep, index_col=index_col, usecols=usecols, nrows=nrows, skiprows=skiprows)
         if proc:
-            self.df = self._convert_to_ensg()
-        return self.df, rel_path
+            self.df = self._convert_to_ensg(self.df)
+        return self.df, rel_path, gseID
         
-    def download(self, root, format='RAW'):
+    def download(self, root, format='RAW', xml_fname="IdList.xml"):
         # Set up logging for successful downloads
         success_log_file = os.path.join(root, "success_log.txt")
         success_logger = logging.getLogger('success_logger')
@@ -189,15 +190,17 @@ class GEO(Data):
                 error_logger.error(f"Failed to download file. Status code: {response.status_code}, GSE ID: {gse_id}, URL: {url}")
 
         # Main logic
-        xml_fname = "IdList.xml"
         xml_path = os.path.join(root, xml_fname)
         id_list = self.get_ids_from_xml(xml_path)
 
-        for id in id_list:
+        def process_id(id):
             gse_id = "GSE" + str(int(str(id)[3:]))
-            output_dir = os.path.join(root, str(id))
+            output_dir = os.path.join(root, "raw_data", str(id))
             os.makedirs(output_dir, exist_ok=True)
             download_counts(gse_id, output_dir, format)
+
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            executor.map(process_id, id_list)
 
         success_logger.info(f"All the files have been processed!")
         return
@@ -224,19 +227,32 @@ class GEO(Data):
             total += df.shape[1]
         return total
     
-    def _gen_catalogue(self):
-        xml_path = "/projects/ovcare/classification/Behnam/datasets/genomics/GEO/rna_seq_HomoSapien/IdList.xml"
-        id_list = self.get_ids_from_xml(xml_path)
-
+    def _gen_catalogue(self, exclusions=None):
         gid_list = [] 
         sid_list = [] 
         fnm_list = [] 
-        for uid in tqdm(id_list):
-            data, rel_path = self.load_by_UID(uid)
-            samples = data.index.tolist()
-            gid_list += [uid] * len(samples)
-            sid_list += samples
-            fnm_list += [rel_path] * len(samples)
+        
+        files = futils.list_files(os.path.join(self.root, "data"), extension=".pkl", depth=4)
+        
+        for filename in tqdm(files):
+            try: 
+                data = self.load_pickle(filename)
+                match = re.search(r"GSE\d+", filename)
+                if match:
+                    gse_id = match.group()
+                else: 
+                    print("GSE NOT FOUND!!")
+                    gse_id = "Unknown"
+
+                # Check if the experiment is not excluded. 
+                if exclusions is None or gse_id not in exclusions:
+                    gid_list += [gse_id]
+                    sid_list += data.index.tolist()
+                    fnm_list += [filename[len(self.root)+1:]]
+                else: 
+                    print(f"GSE excluded: {gse_id}")
+            except: 
+                print(f"Broken File {filename}")
 
         self.catalogue= pd.DataFrame({
             'dataset': self.name,
@@ -248,3 +264,40 @@ class GEO(Data):
         self.save(data=self.catalogue, rel_path='catalogue.csv')
         return self.catalogue
     
+    def _gen_catalogue_old(self, xml_path, exclusions=None):
+        id_list = self.get_ids_from_xml(xml_path)
+
+        gid_list = [] 
+        sid_list = [] 
+        fnm_list = [] 
+        for uid in tqdm(id_list):
+            data, rel_path, gse_id = self.load_by_UID(uid)
+
+            # Check if the experiment is not excluded. 
+            if exclusions is None or gse_id not in exclusions:
+                samples = data.index.tolist()
+                gid_list += [uid] * len(samples)
+                sid_list += samples
+                fnm_list += [rel_path] * len(samples)
+
+        self.catalogue= pd.DataFrame({
+            'dataset': self.name,
+            'cancer_type': 'Unknown',
+            'group_id': gid_list,
+            'sample_id': sid_list,
+            'filename': fnm_list
+        })
+        self.save(data=self.catalogue, rel_path='catalogue.csv')
+        return self.catalogue
+    
+    def extract_gsms(self, xml_path):
+        id_list = self.get_ids_from_xml(xml_path)
+        def process_uid(uid):
+            df, rp, _ = self.load_by_UID(uid, proc=False)
+            for col_name in df.columns:
+                df_ensg = self._convert_to_ensg(df[col_name])
+                pickle_path = os.path.join("pickled_Data", rp[:-16], col_name) + ".pkl"
+                self.to_pickle(df_ensg, pickle_path)
+
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            executor.map(process_uid, id_list)

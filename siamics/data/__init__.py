@@ -22,8 +22,9 @@ def get_common_genes(reference_data, target_data, ignore_subids=True, keep_dupli
 def pad_dataframe(reference_data, target_data, pad_token=0):
 
     missing_cols = set(reference_data.columns) - set(target_data.columns)
-    for col in missing_cols:
-        target_data[col] = pad_token
+    if missing_cols:
+        target_data = target_data.reindex(columns=target_data.columns.tolist() + list(missing_cols), fill_value=pad_token)
+        
     target_data = target_data[reference_data.columns]
     return target_data
 
@@ -72,10 +73,9 @@ class Data(Dataset):
         # if embeddings are available
         if self.embed_name:
             epath = self.get_embed_fname(self.catalogue.loc[idx, 'filename'])
-            with open(os.path.join(self.root, epath), 'rb') as f:
-                data = pickle.load(f)
+            file_path = os.path.join(self.root, epath)
+            data = self.load_pickle(file_path)
         else:
-            # print(f'loading: {self.catalogue.loc[idx, "filename"]}')
             file_path = self.catalogue.loc[idx, 'filename']
             data = self.load_pickle(file_path)
             if self.augment and np.random.rand() < 0.5:
@@ -86,12 +86,9 @@ class Data(Dataset):
         # Getting label 
         try: 
             metadata = self.catalogue.loc[idx:idx]
-            # metadata = self.catalogue.loc[idx, 'cancer_type']
-            # label = self.get_subtype_index(label)
         except: 
             metadata = None
         
-        # print(data)
         return data, metadata, idx
     
     def collate_fn(self, batch, num_devices=None, metadata=False):
@@ -219,11 +216,15 @@ class Data(Dataset):
         futils.create_directories(file_path)
         data.to_csv(file_path, index=index, sep=sep)
     
-    def to_pickle(self, data, rel_path):
+    def to_pickle(self, data, rel_path, overwrite=False):
         file_path = os.path.join(self.root, rel_path)
-        print(f"Saving to file: {file_path}")
-        futils.create_directories(file_path)
-        data.to_pickle(file_path)
+        
+        if os.path.isfile(file_path) and not overwrite:
+            print(f"Skipping, file already exists: {file_path}")
+        else:
+            print(f"Saving to file: {file_path}")
+            futils.create_directories(file_path)
+            data.to_pickle(file_path)
 
     def load_batch(self, filenames):
         df_lists = []
