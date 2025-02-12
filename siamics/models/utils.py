@@ -14,7 +14,6 @@ def create_cosine_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=
         const_fn = optax.constant_schedule(value=base_learning_rate)
         cosine_fn = optax.cosine_decay_schedule(init_value=base_learning_rate, decay_steps=cosine_steps, alpha=cosine_alpha)
         schedule_fn = optax.join_schedules(schedules=[warmup_fn, const_fn, cosine_fn], boundaries=[warmup_steps, warmup_steps + const_steps])
-
     else: 
         schedule_fn = optax.cosine_decay_schedule(init_value=base_learning_rate, decay_steps=total_steps, alpha=cosine_alpha)
 
@@ -24,7 +23,6 @@ def create_const_lr_fn(num_epochs, base_learning_rate, steps_per_epoch):
     """Creates learning rate schedule."""
     total_steps = num_epochs * steps_per_epoch
     warmup_steps = total_steps // 5
-
     warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.01, end_value=base_learning_rate, transition_steps=warmup_steps)
     const_fn = optax.constant_schedule(value=base_learning_rate)
     schedule_fn = optax.join_schedules(schedules=[warmup_fn, const_fn], boundaries=[warmup_steps])
@@ -51,6 +49,7 @@ def create_cosineAnnealing_fn(num_epochs, base_learning_rate, steps_per_epoch, n
     bracket=[]
     for i in range(1, nb_cycles):
         bracket.insert(0, total_steps // (2**i))
+
     bracket.append(total_steps)
     bracket.insert(0,0)
     steps = [bracket[i]-bracket[i-1] for i in range(1,len(bracket))]
@@ -71,15 +70,17 @@ def create_cosineAnnealing_fn(num_epochs, base_learning_rate, steps_per_epoch, n
     return schedule_fn
 
 def CosineAnnealingWarmupRestarts_fn(
-    first_cycle_steps=15,
-    cycle_mult=2,
-    max_lr=5e-4,
-    min_lr=1e-7,
-    warmup_steps=5,
-    gamma=0.9,
-    cosine_alpha=0.1):
+        num_epochs, 
+        steps_per_epoch,
+        first_cycle_steps=15,
+        cycle_mult=2,
+        max_lr=5e-4,
+        min_lr=1e-7,
+        warmup_steps=5,
+        gamma=0.9,
+        cosine_alpha=0.1):
+    
     """Creates learning rate schedule."""
-
     total_steps = num_epochs * steps_per_epoch
     bracket =[]
     schedules = []
@@ -92,7 +93,7 @@ def CosineAnnealingWarmupRestarts_fn(
         warmup_fn = optax.linear_schedule(init_value=min_lr, end_value=max_lr, transition_steps=warmup_steps)
         cosine_fn = optax.cosine_decay_schedule(init_value=max_decayed_lr, decay_steps=cosine_steps, alpha=cosine_alpha)
         schedules.append(warmup_fn, cosine_fn)
-        barcket.append(warmup_steps, cosine_steps)        
+        bracket.append(warmup_steps, cosine_steps)        
         
         calc_steps += (warmup_steps + cosine_steps)
         max_decayed_lr *= gamma
