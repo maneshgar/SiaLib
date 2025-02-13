@@ -1,4 +1,4 @@
-import os, pickle
+import os
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
@@ -30,10 +30,15 @@ def pad_dataframe(reference_data, target_data, pad_token=0):
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None, augment=False):
+    def __init__(self, name, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None, augment=False, metadata=None):
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
+        self.metdata=metadata
+
+        self.data_mode="raw"
+        if embed_name: self.data_mode="features"
+        self.valid_modes=['raw', 'features']
 
         # Wehter to use default root or given root. 
         if root: 
@@ -71,17 +76,18 @@ class Data(Dataset):
 
     def __getitem__(self, idx):
         # if embeddings are available
-        if self.embed_name:
-            epath = self.get_embed_fname(self.catalogue.loc[idx, 'filename'])
-            file_path = os.path.join(self.root, epath)
-            data = self.load_pickle(file_path)
-        else:
+        if self.data_mode == 'raw':
             file_path = self.catalogue.loc[idx, 'filename']
             data = self.load_pickle(file_path)
             if self.augment and np.random.rand() < 0.5:
                 print(f"Augmenting data Before: {data.columns}")
                 data = data.sample(frac=1, axis=1).reset_index(drop=True)
                 print(f"After: {data.columns}")
+
+        if self.data_mode == 'features':
+            epath = self.get_embed_fname(self.catalogue.loc[idx, 'filename'])
+            file_path = os.path.join(self.root, epath)
+            data = self.load_pickle(file_path)
 
         # Getting label 
         try: 
@@ -165,6 +171,12 @@ class Data(Dataset):
 
         return self.trainset, self.validset, self.testset
 
+    def set_data_mode(self, mode):
+        if mode in self.valid_modes:
+            self.data_mode = mode
+        else: 
+            print(f"invalid data mode:: {mode}")
+
     def data_loader(self, batch_size, cancer_types=None, shuffle=True, seed=0):
         data_ptrs = self.get_catalogue(types=cancer_types)
         data_size = data_ptrs.shape[0]
@@ -233,7 +245,7 @@ class Data(Dataset):
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, root=None, augment=False):
+    def __init__(self, datasets, subset, root=None, augment=False, embed_name=None, metadata=None):
         """
         Initialize the DataWrapper with a list of datasets.
         
@@ -244,13 +256,13 @@ class DataWrapper(Dataset):
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
         if subset == 'full':
-            self.datasets = [self.datasets_cls[index](dataset.catalogue, root=root) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.catalogue, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
-            self.datasets = [self.datasets_cls[index](dataset.trainset, root=root) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.trainset, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'validset':
-            self.datasets = [self.datasets_cls[index](dataset.validset, root=root) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.validset, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
-            self.datasets = [self.datasets_cls[index](dataset.testset, root=root) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.testset, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
         else:
             raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'train', 'valid', or 'test'.")
 
@@ -288,6 +300,14 @@ class DataWrapper(Dataset):
         
         # Return the sample from the appropriate dataset
         return self.datasets[dataset_idx][sample_idx]
+
+    def get_active_dataset(self, idx):
+        dataset_idx = np.searchsorted(self.cumulative_lengths, idx, side='right')
+        return self.datasets[dataset_idx], dataset_idx
+    
+    def set_data_mode(self, mode):
+        for dataset in self.datasets:
+            dataset.set_data_mode(mode)
 
     def collate_fn(self, batch, num_devices=None, metadata=False):
         meta = None

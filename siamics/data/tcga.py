@@ -87,9 +87,10 @@ class TCGA(Data):
 
         survival_data = pd.concat(survival_list, ignore_index=True)
         self.catalogue = self.catalogue.merge(survival_data, how='left', left_on='patient_id', right_on='_PATIENT')
-        self.catalogue = self.catalogue.drop(columns=["_PATIENT"])    
+        self.catalogue = self.catalogue.drop(columns=["_PATIENT"])
         if dropnan:
-            self.catalogue = self.catalogue.dropna()   
+            self.catalogue = self.catalogue.dropna()
+        self.catalogue = self.catalogue.reset_index(drop=True)
         return self.catalogue
 
     def get_embed_fname(self, path, fm_config_name=None):
