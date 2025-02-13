@@ -13,8 +13,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 class GEO(Data):
 
-    def __init__(self, catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+    def __init__(self, catname='catalogue', catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+        
         self.geneID = 'GeneID'
+
+        self.catname = catname
 
         self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
                             'MusMusculus': 'rna_seq_MusMusculus'}
@@ -53,17 +56,6 @@ class GEO(Data):
                 print(f"Saving:: {pkl_name}")
                 data.to_pickle(os.path.join(self.root, pkl_name))
 
-            # try: 
-            #     new_filename=os.path.join(self.root, "data", fname[:-7], f"{gsm}.pkl")
-            #     data = self.load_pickle(fname)
-            #     print(f"Loading:: {new_filename}! pickle found")
-
-            # except: 
-            #     data = self.load(fname, usecols=[self.geneID, gsm], proc=True)
-            #     futils.create_directories(new_filename)
-            #     print(f"Saving:: {new_filename}")
-            #     data.to_pickle(new_filename)
-
         return data, None, idx
         
     def _convert_to_ensg(self, df):
@@ -82,22 +74,22 @@ class GEO(Data):
         # sort columns  
         return merged_df[merged_df.columns.sort_values()]
 
-    def _split_catalogue(self):
+    def _split_catalogue(self, y_colname='cancer_type', groups_colname='group_id'):
         # Initial split for train and temp (temp will later be split into validation and test)
         gss = GroupShuffleSplit(n_splits=1, test_size=0.1, random_state=42)  # 70% train, 30% temp
-        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['cancer_type'].tolist(), groups=self.catalogue['group_id'].tolist()))
+        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue[y_colname].tolist(), groups=self.catalogue[groups_colname].tolist()))
         tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
         self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
 
         gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
-        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['cancer_type'].tolist(), groups=tempset['group_id'].tolist()))
+        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset[y_colname].tolist(), groups=tempset[groups_colname].tolist()))
 
         self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
         self.testset = tempset.iloc[test_idx].reset_index(drop=True)
 
-        self.save(self.trainset, 'catalogue_train.csv')
-        self.save(self.validset, 'catalogue_valid.csv')
-        self.save(self.testset, 'catalogue_test.csv')
+        self.save(self.trainset, f'{self.catname}_train.csv')
+        self.save(self.validset, f'{self.catname}_valid.csv')
+        self.save(self.testset, f'{self.catname}_test.csv')
         
         return self.trainset, self.validset, self.testset
         
@@ -227,67 +219,49 @@ class GEO(Data):
             total += df.shape[1]
         return total
     
-    def _gen_catalogue(self, exclusions=None):
+    def _gen_catalogue(self, experiments=[], type="exc", dname_postfix=None):
         gid_list = [] 
         sid_list = [] 
         fnm_list = [] 
         
         files = futils.list_files(os.path.join(self.root, "data"), extension=".pkl", depth=4)
-        
+        print(f"Walking found {len(files)} files.")
         for filename in tqdm(files):
             try: 
-                data = self.load_pickle(filename)
                 match = re.search(r"GSE\d+", filename)
                 if match:
                     gse_id = match.group()
-                else: 
-                    print("GSE NOT FOUND!!")
-                    gse_id = "Unknown"
 
-                # Check if the experiment is not excluded. 
-                if exclusions is None or gse_id not in exclusions:
+                    # Check if the experiment is not excluded. 
+                    if type == "exc" and gse_id in experiments:
+                        continue
+                    
+                    if type == "inc" and gse_id not in experiments:
+                        continue
+                    
+                    data = self.load_pickle(filename)
                     gid_list += [gse_id]
                     sid_list += data.index.tolist()
                     fnm_list += [filename[len(self.root)+1:]]
+
                 else: 
-                    print(f"GSE excluded: {gse_id}")
+                    print(f"GSE not found, skipping file:: {filename}")
+
             except: 
                 print(f"Broken File {filename}")
 
-        self.catalogue= pd.DataFrame({
-            'dataset': self.name,
-            'subtype': 'Unknown',
-            'group_id': gid_list,
-            'sample_id': sid_list,
-            'filename': fnm_list
-        })
-        self.save(data=self.catalogue, rel_path='catalogue.csv')
-        return self.catalogue
-    
-    def _gen_catalogue_old(self, xml_path, exclusions=None):
-        id_list = self.get_ids_from_xml(xml_path)
-
-        gid_list = [] 
-        sid_list = [] 
-        fnm_list = [] 
-        for uid in tqdm(id_list):
-            data, rel_path, gse_id = self.load_by_UID(uid)
-
-            # Check if the experiment is not excluded. 
-            if exclusions is None or gse_id not in exclusions:
-                samples = data.index.tolist()
-                gid_list += [uid] * len(samples)
-                sid_list += samples
-                fnm_list += [rel_path] * len(samples)
+        # works for datasets for subtasks like GEO_BRCA
+        if dname_postfix: dname = f"{self.name}_{dname_postfix}"
+        else: dname = self.name
 
         self.catalogue= pd.DataFrame({
-            'dataset': self.name,
+            'dataset': dname,
             'cancer_type': 'Unknown',
             'group_id': gid_list,
             'sample_id': sid_list,
             'filename': fnm_list
         })
-        self.save(data=self.catalogue, rel_path='catalogue.csv')
+        self.save(data=self.catalogue, rel_path=f"{self.catname}.csv")
         return self.catalogue
     
     def extract_gsms(self, xml_path):
@@ -301,3 +275,73 @@ class GEO(Data):
 
         with ThreadPoolExecutor(max_workers=16) as executor:
             executor.map(process_uid, id_list)
+
+class GEO_BRCA(GEO):
+    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+        
+        self.subset="BRCA"
+        self.series = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue(experiments=self.series, type="inc")
+
+        # find a way to add metadata
+        return
+                                                
+class GEO_BLCA(GEO):
+    def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+        
+        self.subset="BLCA"
+        self.series = ["GSE244957", "GSE160693", "GSE154261"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue(experiments=self.series, type="inc")
+
+        # find a way to add metadata
+        return
+    
+class GEO_PACA(GEO):
+    def __init__(self, catname="catalogue_paca", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+        
+        self.subset="PACA"
+        self.series = ["GSE172356", "GSE93326"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue(experiments=self.series, type="inc")
+
+        # find a way to add metadata
+        return
+    
+class GEO_COAD(GEO):
+    def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+        
+        self.subset="COAD"
+        self.series = ["GSE190609", "GSE101588", "GSE152430", "GSE132465", "GSE144735"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue(experiments=self.series, type="inc")
+
+        # find a way to add metadata
+        return
+    
+class GEO_SURV(GEO):
+    def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+        
+        self.subset="SURV"
+        self.series = ["GSE154261", "GSE87340", "GSE165808"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue(experiments=self.series, type="inc")
+
+        # find a way to add metadata
+        return

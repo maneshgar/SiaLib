@@ -15,18 +15,20 @@ def convert_to_single_file_ensg_pickle(root, xml_fname):
     dataset.root = os.path.join(root, "raw_data")
     dataset.extract_gsms(os.path.join(root, xml_fname))
  
-def generate_catalogue(exc=None):
-    dataset = geo.GEO()
-    dataset._gen_catalogue(exclusions=exc)
+def generate_catalogue(dataset):
+    dataset._gen_catalogue()
     dataset._split_catalogue()
 
-exc_survival = ["GSE154261", "GSE87340", "GSE165808"]
-exc_pancreatic= ["GSE172356", "GSE93326"]
-exc_coad = ["GSE190609", "GSE101588", "GSE152430", "GSE132465", "GSE144735"]
-exc_bladder = ["GSE244957", "GSE160693", "GSE154261"]
-exc_breast = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"]
-exc_lists = [exc_survival, exc_pancreatic, exc_coad, exc_bladder, exc_breast]
-exc_gses = [item for sublist in exc_lists for item in sublist]
+geo_brca = geo.GEO_BRCA()
+geo_blca = geo.GEO_BLCA()
+geo_paca = geo.GEO_PACA()
+geo_coad = geo.GEO_COAD()
+geo_surv = geo.GEO_SURV()
+
+exp_lists = [geo_brca.series, geo_blca.series, geo_paca.series, geo_coad.series, geo_surv.series]
+exp_gses = [item for sublist in exp_lists for item in sublist]
+
+geo_brca = geo.GEO_BRCA()
 
 # root = "/projects/ovcare/classification/Behnam/datasets/genomics/GEO/rna_seq_HomoSapien_raw_data/"
 # xml_fname = "GEO_10-02-2025.xml"
@@ -34,7 +36,12 @@ exc_gses = [item for sublist in exc_lists for item in sublist]
 # convert_to_single_file_ensg_pickle(root, xml_fname)
 
 # Before running this the data needs to be moved to the final destination. folder data.
-generate_catalogue(exc=exc_gses)
+# generate_catalogue(dataset=geo.GEO(), inclusion=survival)
+generate_catalogue(dataset=geo_brca)
+generate_catalogue(dataset=geo_blca)
+generate_catalogue(dataset=geo_paca)
+generate_catalogue(dataset=geo_coad)
+generate_catalogue(dataset=geo_surv)
 
 
 

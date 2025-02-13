@@ -30,17 +30,17 @@ def pad_dataframe(reference_data, target_data, pad_token=0):
 
 class Data(Dataset):
 
-    def __init__(self, dataset, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None, augment=False):
-        self.name = dataset
+    def __init__(self, name, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None, augment=False):
+        self.name = name
         self.embed_name = embed_name
         self.augment = augment
 
         # Wehter to use default root or given root. 
         if root: 
-            self.root = os.path.join(root, dataset)
+            self.root = os.path.join(root, name)
         else: 
             self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
-            self.root= os.path.join(self.datasets_path, dataset, relpath)
+            self.root= os.path.join(self.datasets_path, name, relpath)
         
         # Wether to use default Catalogue or provided ones. 
         if catalogue is None:

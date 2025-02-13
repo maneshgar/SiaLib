@@ -38,7 +38,7 @@ class TCGA(Data):
 
         self.catalogue= pd.DataFrame({
             'dataset': self.name,
-            'subtype': sub_list,
+            'cancer_type': sub_list,
             'group_id': gid_list,
             'sample_id': sid_list,
             'filename': fnm_list
@@ -97,7 +97,7 @@ class TCGA(Data):
     def save(self, data, rel_path, sep=","):
         return super().save(data, rel_path, sep)
 
-    def get_subtype_index(self, str_labels):
+    def get_cancer_type_index(self, str_labels):
         labels = []
         for lbl in str_labels: 
             for idx, item in enumerate(self.classes):
@@ -109,13 +109,13 @@ class TCGA(Data):
         return labels
     
     # AIM function
-    def cp_from_server(self, root, subtype=None):
+    def cp_from_server(self, root, cancer_type=None):
         rel_dir="Cases/*/Transcriptome Profiling/Gene Expression Quantification/*/*.tsv"
         # List all the cases
         types_list = glob(os.path.join(root, "*/"))
         types_names = [name.split("/")[-2] for name in types_list]
         for ind, type in enumerate(types_list):
-            if subtype and subtype != types_names[ind]:
+            if cancer_type and cancer_type != types_names[ind]:
                 continue
             filenames = glob(os.path.join(type, rel_dir))
             for file in filenames:
@@ -131,8 +131,8 @@ class TCGA(Data):
         print("Possibly you need to apply these changes manually:")
         print("TCGA-ESCA -> ESCA, TCGA-LUSC -> LUSC, OV -> remove, OVARIAN -> OV")
         
-    def gen_ensg(self, raw_dir, data_dir, subtype=None):
-        for batch, _ in self.data_loader(batch_size=1, subtype=subtype,shuffle=False):
+    def gen_ensg(self, raw_dir, data_dir, cancer_type=None):
+        for batch, _ in self.data_loader(batch_size=1, cancer_type=cancer_type,shuffle=False):
             rel_filename = batch.loc[batch.index[0], 'filename'][len(raw_dir)+1:]
             inp_path = os.path.join(raw_dir, rel_filename)
             df = self.load(inp_path, proc=True, usecols=[self.geneID, "tpm_unstranded"], sep="\t").astype(str)
