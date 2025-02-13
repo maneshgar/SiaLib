@@ -84,7 +84,7 @@ class Data(Dataset):
                 data = data.sample(frac=1, axis=1).reset_index(drop=True)
                 print(f"After: {data.columns}")
 
-        if self.data_mode == 'features':
+        elif self.data_mode == 'features':
             epath = self.get_embed_fname(self.catalogue.loc[idx, 'filename'])
             file_path = os.path.join(self.root, epath)
             data = self.load_pickle(file_path)

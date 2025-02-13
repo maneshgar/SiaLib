@@ -2,6 +2,7 @@ import umap
 import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
+import jax, wandb
 from siamics.utils.futils import create_directories
 
 def plot_umap(
@@ -85,6 +86,19 @@ def plot_umap(
     # Return the in-memory image if requested
     return image_buffer
 
+def plot_grads_hist(grads, wandb_prefix):
+    # Log histograms of gradients per layer
+    grad_histograms = {}
+    flat_grads = jax.tree_util.tree_flatten_with_path(grads)
+    
+    for path, grad in flat_grads[0]:  # flat_grads[0] contains (path, value) tuples
+        if grad is not None:  # Some params might not have gradients
+            # Convert path (a tuple of keys) into a readable name
+            name = "/".join(str(k) for k in path)  
+            grad_histograms[f"{wandb_prefix}-grad/{name}"] = wandb.Histogram(grad.flatten())
+    
+    return grad_histograms
+    
 def plot_hist(data):
     # Plot histogram
     plt.figure(figsize=(10, 5))
