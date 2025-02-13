@@ -9,7 +9,7 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, cancer_types=None, root=None, embed_name=None, augment=False):
+    def __init__(self, catalogue=None, cancer_types=None, root=None, metadata=[], embed_name=None, augment=False):
         self.geneID = "gene_id"
         
         if cancer_types:
@@ -21,6 +21,9 @@ class TCGA(Data):
             self.classes = len(self.cancer_types)
 
         super().__init__("TCGA", catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment)
+
+        if 'survival' in metadata:
+            self._read_survival_metadata()
 
     def _gen_catalogue(self, dirname, ext='.csv'):
         sub_list = [] 
@@ -74,6 +77,20 @@ class TCGA(Data):
         # sort columns  
         df = df[df.columns.sort_values()]
         return df
+
+    def _read_survival_metadata(self, dir="survival", dropnan=True):
+        survival_files = glob(os.path.join(self.root, dir, "*.txt"))
+        survival_list = []
+        for file in survival_files:
+            df = self.load(abs_path=file, sep="\t", index_col=None)
+            survival_list.append(df[['_PATIENT', 'OS', 'OS.time', 'PFI', 'PFI.time']])
+
+        survival_data = pd.concat(survival_list, ignore_index=True)
+        self.catalogue = self.catalogue.merge(survival_data, how='left', left_on='patient_id', right_on='_PATIENT')
+        self.catalogue = self.catalogue.drop(columns=["_PATIENT"])    
+        if dropnan:
+            self.catalogue = self.catalogue.dropna()   
+        return self.catalogue
 
     def get_embed_fname(self, path, fm_config_name=None):
         if self.embed_name:
