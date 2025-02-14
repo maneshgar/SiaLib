@@ -6,9 +6,9 @@ from tqdm import tqdm
 
 class GTEx(Data):
     
-    def __init__(self, catalogue=None, root=None, augment=False):
+    def __init__(self, catalogue=None, root=None, embed_name=None, augment=False, meta_modes=[]):
         self.file_name = "GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz"
-        super().__init__("GTEx", catalogue=catalogue, root=root, augment=augment)
+        super().__init__("GTEx", catalogue=catalogue, root=root, embed_name=embed_name, augment=augment, meta_modes=meta_modes)
     
     def export_data(self, file_name, sep="\t"):
         # Load the CSV file

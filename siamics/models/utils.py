@@ -6,11 +6,11 @@ def create_cosine_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=
     total_steps = num_epochs * steps_per_epoch
     
     if warmup:
-        warmup_steps = total_steps // 5
+        warmup_steps = min(5000, total_steps // 5)
         const_steps  = max(0, (total_steps) // 5)
         cosine_steps = max(0, total_steps - (warmup_steps + const_steps))
 
-        warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.01, end_value=base_learning_rate, transition_steps=warmup_steps)
+        warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.001, end_value=base_learning_rate, transition_steps=warmup_steps)
         const_fn = optax.constant_schedule(value=base_learning_rate)
         cosine_fn = optax.cosine_decay_schedule(init_value=base_learning_rate, decay_steps=cosine_steps, alpha=cosine_alpha)
         schedule_fn = optax.join_schedules(schedules=[warmup_fn, const_fn, cosine_fn], boundaries=[warmup_steps, warmup_steps + const_steps])
@@ -23,7 +23,7 @@ def create_const_lr_fn(num_epochs, base_learning_rate, steps_per_epoch):
     """Creates learning rate schedule."""
     total_steps = num_epochs * steps_per_epoch
     warmup_steps = total_steps // 5
-    warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.01, end_value=base_learning_rate, transition_steps=warmup_steps)
+    warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.001, end_value=base_learning_rate, transition_steps=warmup_steps)
     const_fn = optax.constant_schedule(value=base_learning_rate)
     schedule_fn = optax.join_schedules(schedules=[warmup_fn, const_fn], boundaries=[warmup_steps])
     return schedule_fn
@@ -36,7 +36,7 @@ def create_linear_lr_fn(num_epochs, base_learning_rate, steps_per_epoch):
     const_steps = max(0, ((total_steps) // 4) - warmup_steps)
     linear_steps = max(0, total_steps - (warmup_steps + const_steps))
 
-    warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.01, end_value=base_learning_rate, transition_steps=warmup_steps)
+    warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.001, end_value=base_learning_rate, transition_steps=warmup_steps)
     const_fn = optax.constant_schedule(value=base_learning_rate)
     linear_fn = optax.linear_schedule(init_value=base_learning_rate, end_value=base_learning_rate * 0.1, transition_steps=linear_steps)
     schedule_fn = optax.join_schedules(schedules=[warmup_fn, const_fn, linear_fn], boundaries=[warmup_steps, warmup_steps+const_steps])
@@ -53,7 +53,7 @@ def create_cosineAnnealing_fn(num_epochs, base_learning_rate, steps_per_epoch, n
     bracket.append(total_steps)
     bracket.insert(0,0)
     steps = [bracket[i]-bracket[i-1] for i in range(1,len(bracket))]
-    warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.01, end_value=base_learning_rate, transition_steps=steps[0])
+    warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.001, end_value=base_learning_rate, transition_steps=steps[0])
     
     print(f"bracket, {bracket}")
     print(f"steps, {steps}")
@@ -103,7 +103,7 @@ def CosineAnnealingWarmupRestarts_fn(
     return schedule_fn
 
 # Initialize optimizer state
-def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_type, warmup=True, clip_norm=1.0):
+def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_type, momentum=0.999, warmup=True, clip_norm=1.0):
     # Optimizer setup
     
     if scheduler_type == 'cosine':
@@ -119,7 +119,7 @@ def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_
     
     optimizer = optax.chain(
         optax.clip_by_global_norm(clip_norm),  # Clip gradients to a maximum global norm
-        optax.adamw(lr_scheduler, b2=0.96)
+        optax.adamw(lr_scheduler, b2=momentum)
     )
     
     return optimizer, optimizer.init(params), lr_scheduler

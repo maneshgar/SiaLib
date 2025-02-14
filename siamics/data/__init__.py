@@ -30,11 +30,12 @@ def pad_dataframe(reference_data, target_data, pad_token=0):
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, relpath="", cancer_types=None, root=None, embed_name=None, augment=False, metadata=None):
+    def __init__(self, name, catalogue=None, ctname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, meta_modes=[]):
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
-        self.metdata=metadata
+        self.metdata=meta_modes
+        self.ctname = ctname
 
         self.data_mode="raw"
         if embed_name: self.data_mode="features"
@@ -162,7 +163,7 @@ class Data(Dataset):
 
         if types:
             df_train = df_train[df_train['cancer_type'].isin(types)].reset_index(drop=True)
-            df_valid = df_valid[df_valid['cancer_types'].isin(types)].reset_index(drop=True)
+            df_valid = df_valid[df_valid['cancer_type'].isin(types)].reset_index(drop=True)
             df_test  = df_test[df_test['cancer_type'].isin(types)].reset_index(drop=True)
         
         self.trainset = df_train
@@ -218,7 +219,12 @@ class Data(Dataset):
             raise ValueError
         
         if verbos: print(f"Loading data: {file_path} ... ", end="")
-        df = pd.read_pickle(file_path)
+        
+        try: 
+            df = pd.read_pickle(file_path)
+        except:
+            print(f"Failed to load file: {file_path}")
+
         if verbos: print("   Done!")
         return df
 
@@ -245,7 +251,7 @@ class Data(Dataset):
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, root=None, augment=False, embed_name=None, metadata=None):
+    def __init__(self, datasets, subset, root=None, augment=False, embed_name=None, meta_modes=[], sub_sampled=False):
         """
         Initialize the DataWrapper with a list of datasets.
         
@@ -256,15 +262,21 @@ class DataWrapper(Dataset):
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
         if subset == 'full':
-            self.datasets = [self.datasets_cls[index](dataset.catalogue, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.catalogue, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
-            self.datasets = [self.datasets_cls[index](dataset.trainset, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.trainset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'validset':
-            self.datasets = [self.datasets_cls[index](dataset.validset, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.validset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
-            self.datasets = [self.datasets_cls[index](dataset.testset, root=root, embed_name=embed_name, metadata=metadata) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](dataset.testset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         else:
             raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'train', 'valid', or 'test'.")
+
+        # use a portion of the data only for debugging purpose.
+        if sub_sampled:
+            print("Warning:: loading a sub-sampled dataset. ")
+            for d in self.datasets:
+                d.catalogue = d.catalogue[:128]
 
         self.lengths = [len(dataset) for dataset in self.datasets]
         self.cumulative_lengths = np.cumsum(self.lengths)
@@ -305,6 +317,20 @@ class DataWrapper(Dataset):
         dataset_idx = np.searchsorted(self.cumulative_lengths, idx, side='right')
         return self.datasets[dataset_idx], dataset_idx
     
+    def get_nb_classes(self):
+        count = []
+        for dataset in self.datasets:
+            count.append(dataset.get_nb_classes())
+        cset = set(count)
+        assert(len(cset)==1)
+        return cset.pop()
+
+    def get_cancer_types(self):
+        return self.datasets[0].cancer_types
+
+    def get_class_index(self, labels):
+        return self.datasets[0].get_class_index(labels)
+
     def set_data_mode(self, mode):
         for dataset in self.datasets:
             dataset.set_data_mode(mode)

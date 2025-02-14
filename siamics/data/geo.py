@@ -13,11 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 class GEO(Data):
 
-    def __init__(self, catname='catalogue', catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+    def __init__(self, catname='catalogue', catalogue=None, organism="HomoSapien", dataType='TPM', root=None, embed_name=None, augment=False, meta_modes=[]):
         
         self.geneID = 'GeneID'
-
-        self.catname = catname
 
         self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
                             'MusMusculus': 'rna_seq_MusMusculus'}
@@ -34,7 +32,7 @@ class GEO(Data):
         else: raise ValueError
         
         relpath = self.organisms_dir[self.organism]
-        super().__init__("GEO", catalogue, relpath=relpath, root=root, augment=augment)
+        super().__init__("GEO", catalogue=catalogue, ctname=catname, relpath=relpath, root=root, embed_name=embed_name, augment=augment, meta_modes=meta_modes)
 
     def __getitem__(self, idx):
         pkl_name = self.catalogue.loc[idx, 'filename']

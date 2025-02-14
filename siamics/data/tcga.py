@@ -9,20 +9,22 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, cancer_types=None, root=None, metadata=[], embed_name=None, augment=False):
+    def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
         self.geneID = "gene_id"
         
         if cancer_types:
-            self.cancer_types = [item for sublist in cancer_types for item in (sublist if isinstance(sublist, list) else [sublist])]
+            # To handle nested classes
             self.classes = cancer_types
+            self.cancer_types = [item for sublist in cancer_types for item in (sublist if isinstance(sublist, list) else [sublist])]
         else: 
             self.cancer_types= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
           'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM']
-            self.classes = len(self.cancer_types)
+            self.classes = self.cancer_types
 
+        self.nb_classes = len(self.classes)
         super().__init__("TCGA", catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment)
 
-        if 'survival' in metadata:
+        if 'survival' in meta_modes:
             self._read_survival_metadata()
 
     def _gen_catalogue(self, dirname, ext='.csv'):
@@ -115,7 +117,7 @@ class TCGA(Data):
     def save(self, data, rel_path, sep=","):
         return super().save(data, rel_path, sep)
 
-    def get_cancer_type_index(self, str_labels):
+    def get_class_index(self, str_labels):
         labels = []
         for lbl in str_labels: 
             for idx, item in enumerate(self.classes):
@@ -125,6 +127,9 @@ class TCGA(Data):
                     if lbl == item: labels.append(idx)
 
         return labels
+
+    def get_nb_classes(self):
+        return self.nb_classes
     
     # AIM function
     def cp_from_server(self, root, cancer_type=None):
@@ -160,3 +165,16 @@ class TCGA(Data):
             futils.create_directories(out_path)
             self.save(df, out_path)
         return 
+    
+
+class TCGA5(TCGA):
+    def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
+        cancer_types = ['BRCA', 'BLCA', ['GBM','LGG'], 'LUAD', 'UCEC'] # BRCA, BLCA, GBMLGG, LUAD, and UCEC
+        super().__init__(catalogue, cancer_types, root, meta_modes, embed_name, augment)
+
+class TCGA6(TCGA):
+    def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
+        cancer_types = ['BRCA', 'THCA', 'GBM', 'LGG', 'LUAD', 'UCEC']
+        super().__init__(catalogue, cancer_types, root, meta_modes, embed_name, augment)
+
+
