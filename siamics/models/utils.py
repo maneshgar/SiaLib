@@ -1,4 +1,4 @@
-import optax, jax
+import optax, jax, wandb
 from jax import numpy as jnp
 
 def create_cosine_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=True, cosine_alpha=0.01):
@@ -135,3 +135,17 @@ def compute_grad_norm(grads):
     """Compute the global norm of gradients."""
     norm = jnp.sqrt(sum(jnp.sum(jnp.square(p)) for p in jax.tree_util.tree_leaves(grads)))
     return norm
+
+def plot_grads_hist(grads, wandb_prefix):
+    # Log histograms of gradients per layer
+    grad_histograms = {}
+    flat_grads = jax.tree_util.tree_flatten_with_path(grads)
+    
+    for path, grad in flat_grads[0]:  # flat_grads[0] contains (path, value) tuples
+        if grad is not None:  # Some params might not have gradients
+            # Convert path (a tuple of keys) into a readable name
+            name = "/".join(str(k) for k in path)  
+            grad_histograms[f"{wandb_prefix}-grad/{name}"] = wandb.Histogram(grad.flatten())
+    
+    return grad_histograms
+    

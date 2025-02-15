@@ -172,6 +172,14 @@ class Data(Dataset):
 
         return self.trainset, self.validset, self.testset
 
+    def get_embed_fname(self, path, fm_config_name=None):
+        if self.embed_name:
+            model_name = self.embed_name
+        else: 
+            model_name = fm_config_name
+
+        return f'features/{model_name}/{path[5:-3]}pkl'
+
     def set_data_mode(self, mode):
         if mode in self.valid_modes:
             self.data_mode = mode

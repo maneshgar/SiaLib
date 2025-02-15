@@ -95,14 +95,6 @@ class TCGA(Data):
         self.catalogue = self.catalogue.reset_index(drop=True)
         return self.catalogue
 
-    def get_embed_fname(self, path, fm_config_name=None):
-        if self.embed_name:
-            model_name = self.embed_name
-        else: 
-            model_name = fm_config_name
-
-        return f'features/{model_name}/{path[5:-3]}pkl'
-
     def load(self, rel_path=None, abs_path=None, proc=False, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0, ext=None, idx=None, verbos=False):
         if rel_path is not None and ext:
             rel_path = rel_path + ext

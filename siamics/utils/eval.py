@@ -1,6 +1,7 @@
 from sklearn import metrics 
 import matplotlib.pyplot as plt
 import seaborn as sns
+from lifelines.utils import concordance_index
 
 class Classification: 
 
@@ -97,3 +98,19 @@ class ClassificationOnTheFly:
             self.update_metrics()
         print(f"Classification Report: \n{self.titles}\n{self.report}")
         print(f"Confusion Matrix: \n{self.titles}\n{self.cm}")
+
+class Survival:
+
+    def __init__(self):
+        self.survival_time = []
+        self.risk_score = []
+        pass
+    
+    def add_data(self, survival_time, risk_score): 
+        self.survival_time += survival_time
+        self.risk_score += risk_score
+       
+    def update_metrics(self):
+        self.c_index = concordance_index(self.survival_time, self.risk_score)
+        print(f"C-index: {self.c_index:.4f}")
+        return self.c_index
