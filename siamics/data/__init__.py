@@ -45,7 +45,7 @@ class Data(Dataset):
         if root: 
             self.root = os.path.join(root, name)
         else: 
-            self.datasets_path = "/projects/ovcare/classification/Behnam/datasets/genomics/"
+            self.datasets_path = "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/"
             self.root= os.path.join(self.datasets_path, name, relpath)
         
         # Wether to use default Catalogue or provided ones. 

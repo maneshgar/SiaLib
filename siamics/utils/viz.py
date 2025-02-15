@@ -23,7 +23,7 @@ def main(args):
     # Generate timestamp in the format 'YYYYMMDD_HHMMSS'
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    out_dir = os.path.join("/projects/ovcare/classification/Behnam/coding/BulkRNA/output/viz/", timestamp)
+    out_dir = os.path.join("/projects/ovcare/users/behnam_maneshgar/coding/BulkRNA/output/viz/", timestamp)
     print(f"Saving result to: {out_dir}")
 
     if args.dataset == 'tcga':

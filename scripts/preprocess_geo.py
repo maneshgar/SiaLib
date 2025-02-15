@@ -30,7 +30,7 @@ exp_gses = [item for sublist in exp_lists for item in sublist]
 
 geo_brca = geo.GEO_BRCA()
 
-# root = "/projects/ovcare/classification/Behnam/datasets/genomics/GEO/rna_seq_HomoSapien_raw_data/"
+# root = "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/GEO/rna_seq_HomoSapien_raw_data/"
 # xml_fname = "GEO_10-02-2025.xml"
 # download_from_website(root, xml_fname)
 # convert_to_single_file_ensg_pickle(root, xml_fname)
