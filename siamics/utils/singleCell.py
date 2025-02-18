@@ -24,15 +24,15 @@ def expression_extraction(data_dir):
 def update_celltype(celltype):
     #Zheng68k
     if celltype in ["CD8+ Cytotoxic T", "CD8+/CD45RA+ Naive Cytotoxic"]:
-        return "CD8"
+        return "CD8.T.cells"
     elif celltype in ["CD4+/CD45RO+ Memory", "CD4+/CD25 T Reg", "CD4+ T Helper2", "CD4+/CD45RA+/CD25- Naive T"]:
-        return "CD4"
+        return "CD4.T.cells"
     elif celltype == "CD19+ B":
-        return "B"
+        return "B.cells"
     elif celltype == "CD56+ NK":
-        return "NK"
+        return "NK.cells"
     elif celltype in ["Dendritic", "CD14+ Monocyte"]:
-        return "monocytic"
+        return "monocytic.lineage"
     else: #CD34+
         return "others"
     

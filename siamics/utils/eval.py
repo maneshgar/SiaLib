@@ -1,7 +1,9 @@
 from sklearn import metrics 
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from lifelines.utils import concordance_index
+from scipy.stats import pearsonr
 
 class Classification: 
 
@@ -114,3 +116,67 @@ class Survival:
         self.c_index = concordance_index(self.survival_time, self.risk_score)
         print(f"C-index: {self.c_index:.4f}")
         return self.c_index
+    
+class ImmuneDeconv:
+    def __init__(self):
+        self.true_prop = [[]]
+        self.pred_prop = [[]]
+        self.cell_type_pcc = [[]]
+    
+    def add_data(self, true_p, pred_p): 
+        true_p = np.array(true_p)  
+        pred_p = np.array(pred_p)  
+
+        if not hasattr(self, 'true_prop') or self.true_prop is None or isinstance(self.true_prop, list):
+            self.true_prop = np.zeros((0, true_p.shape[1])) 
+
+        if not hasattr(self, 'pred_prop') or self.pred_prop is None or isinstance(self.pred_prop, list):
+            self.pred_prop = np.zeros((0, pred_p.shape[1])) 
+
+        self.true_prop = np.vstack((self.true_prop, true_p))
+        self.pred_prop = np.vstack((self.pred_prop, pred_p))
+
+    def update_metrics(self):
+        squared_error = (self.pred_prop - self.true_prop) ** 2
+        sample_rmse = np.sqrt(np.mean(squared_error, axis=-1))  
+        self.rmse = np.mean(sample_rmse)
+        self.cell_type_pcc = [pearsonr(self.true_prop[:, i], self.pred_prop[:, i])[0] for i in range(self.true_prop.shape[1])]
+        self.pcc = np.mean(self.cell_type_pcc)
+        self.report = f"RMSE: {self.rmse}\nPCC: {self.pcc}"
+
+    def cell_type_pcc_plot(self):
+        num_cell_types = self.true_prop.shape[1]
+        fig, axes = plt.subplots(nrows=1, ncols=num_cell_types, figsize=(5 * num_cell_types, 5))
+
+        cell_types = ['B', 'CD4', 'CD8', 'NK', 'neutrophil', 'monocytic', 'fibroblasts', 'endothelial', 'others']
+
+        if num_cell_types == 1:
+            axes = [axes]
+        
+        for i, ax in enumerate(axes):
+            x = self.true_prop[:, i]
+            y = self.pred_prop[:, i]
+
+            pcc, _ = pearsonr(x, y)
+
+            ax.scatter(x, y, alpha=0.6)
+
+            slope, intercept = np.polyfit(x, y, 1)
+            ax.plot(x, slope * x + intercept, color="blue")
+
+            ax.set_xlabel("True Proportion")
+            ax.set_ylabel("Predicted Proportion")
+            ax.set_title(f"Cell Type {cell_types[i]} (PCC: {pcc:.2f})")
+            ax.legend()
+
+        plt.tight_layout()
+        plt.savefig("cell_type_pcc.png")
+        plt.close()
+
+    def pcc_boxplot(self):
+        plt.figure(figsize=(8, 6))
+        sns.boxplot(data=self.cell_type_pcc)
+        plt.ylabel("PCC")
+        plt.title("PCC Distribution")
+        plt.savefig("pcc_boxplot.png")
+        plt.close()
