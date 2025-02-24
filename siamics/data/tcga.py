@@ -2,14 +2,13 @@ import os
 import pandas as pd
 from glob import glob
 import subprocess
-from sklearn.model_selection import GroupShuffleSplit
 
 from siamics.data import Data
 from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
+    def __init__(self, catalogue=None, catname="catalogue", cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
         self.geneID = "gene_id"
         
         if cancer_types:
@@ -22,10 +21,7 @@ class TCGA(Data):
             self.classes = self.cancer_types
 
         self.nb_classes = len(self.classes)
-        super().__init__("TCGA", catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment)
-
-        if 'survival' in meta_modes:
-            self._read_survival_metadata()
+        super().__init__("TCGA", catalogue=catalogue, catname=catname, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self, dirname, ext='.csv'):
         sub_list = [] 
@@ -51,25 +47,6 @@ class TCGA(Data):
         self.save(data=self.catalogue, rel_path='catalogue.csv')
         return self.catalogue
     
-    def _split_catalogue(self):
-        # Initial split for train and temp (temp will later be split into validation and test)
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.3, random_state=42)  # 70% train, 30% temp
-        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue['cancer_type'].tolist(), groups=self.catalogue['patient_id'].tolist()))
-        tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
-        self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
-
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
-        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset['cancer_type'].tolist(), groups=tempset['patient_id'].tolist()))
-
-        self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
-        self.testset = tempset.iloc[test_idx].reset_index(drop=True)
-
-        self.save(self.trainset, 'catalogue_train.csv')
-        self.save(self.validset, 'catalogue_valid.csv')
-        self.save(self.testset, 'catalogue_test.csv')
-        
-        return self.trainset, self.validset, self.testset
-    
     def _convert_to_ensg(self, df):
         df = df.T
         # drop NaNs - the geneIds that dont have EnsemblGeneID
@@ -79,21 +56,6 @@ class TCGA(Data):
         # sort columns  
         df = df[df.columns.sort_values()]
         return df
-
-    def _read_survival_metadata(self, dir="survival", dropnan=True):
-        survival_files = glob(os.path.join(self.root, dir, "*.txt"))
-        survival_list = []
-        for file in survival_files:
-            df = self.load(abs_path=file, sep="\t", index_col=None)
-            survival_list.append(df[['_PATIENT', 'OS', 'OS.time', 'PFI', 'PFI.time']])
-
-        survival_data = pd.concat(survival_list, ignore_index=True)
-        self.catalogue = self.catalogue.merge(survival_data, how='left', left_on='patient_id', right_on='_PATIENT')
-        self.catalogue = self.catalogue.drop(columns=["_PATIENT"])
-        if dropnan:
-            self.catalogue = self.catalogue.dropna()
-        self.catalogue = self.catalogue.reset_index(drop=True)
-        return self.catalogue
 
     def load(self, rel_path=None, abs_path=None, proc=False, sep=",", index_col=0, usecols=None, nrows=None, skiprows=0, ext=None, idx=None, verbos=False):
         if rel_path is not None and ext:
@@ -169,4 +131,31 @@ class TCGA6(TCGA):
         cancer_types = ['BRCA', 'THCA', 'GBM', 'LGG', 'LUAD', 'UCEC']
         super().__init__(catalogue, cancer_types, root, meta_modes, embed_name, augment)
 
+class TCGA_SURV(TCGA):
+
+    def __init__(self, catalogue=None, catname="catalogue_surv", cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
+        self.subset="SURV"
+        super().__init__(catalogue=catalogue, catname=catname, cancer_types=cancer_types, root=root, meta_modes=meta_modes, embed_name=embed_name, augment=augment)
+
+    def _read_survival_metadata(self, catalogue, dir="survival", dropnan=True):
+        survival_files = glob(os.path.join(self.root, dir, "*.txt"))
+        survival_list = []
+        for file in survival_files:
+            df = self.load(abs_path=file, sep="\t", index_col=None)
+            survival_list.append(df[['_PATIENT', 'OS', 'OS.time', 'PFI', 'PFI.time']])
+
+        survival_data = pd.concat(survival_list, ignore_index=True)
+        catalogue = catalogue.merge(survival_data, how='left', left_on='patient_id', right_on='_PATIENT')
+        catalogue = catalogue.drop(columns=["_PATIENT"])
+        if dropnan:
+            catalogue = catalogue.dropna()
+        return catalogue.reset_index(drop=True)
+
+    def _gen_catalogue(self):
+        tcga = TCGA()
+        self.catalogue = self._read_survival_metadata(tcga.catalogue)
+        self.save(self.catalogue, f'{self.catname}.csv')
+        self._split_catalogue()
+
+        
 

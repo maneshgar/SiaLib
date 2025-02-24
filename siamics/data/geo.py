@@ -32,7 +32,7 @@ class GEO(Data):
         else: raise ValueError
         
         relpath = self.organisms_dir[self.organism]
-        super().__init__("GEO", catalogue=catalogue, ctname=catname, relpath=relpath, root=root, embed_name=embed_name, augment=augment, meta_modes=meta_modes)
+        super().__init__("GEO", catalogue=catalogue, catname=catname, relpath=relpath, root=root, embed_name=embed_name, augment=augment, meta_modes=meta_modes)
 
     def __getitem__(self, idx):
         pkl_name = self.catalogue.loc[idx, 'filename']
@@ -71,25 +71,6 @@ class GEO(Data):
         merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
         # sort columns  
         return merged_df[merged_df.columns.sort_values()]
-
-    def _split_catalogue(self, y_colname='cancer_type', groups_colname='group_id'):
-        # Initial split for train and temp (temp will later be split into validation and test)
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.1, random_state=42)  # 70% train, 30% temp
-        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue[y_colname].tolist(), groups=self.catalogue[groups_colname].tolist()))
-        tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
-        self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
-
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
-        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset[y_colname].tolist(), groups=tempset[groups_colname].tolist()))
-
-        self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
-        self.testset = tempset.iloc[test_idx].reset_index(drop=True)
-
-        self.save(self.trainset, f'{self.catname}_train.csv')
-        self.save(self.validset, f'{self.catname}_valid.csv')
-        self.save(self.testset, f'{self.catname}_test.csv')
-        
-        return self.trainset, self.validset, self.testset
         
     def get_ids_from_xml(self, file_path):
         # Load and parse the XML file

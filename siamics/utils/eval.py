@@ -2,7 +2,7 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 import seaborn as sns
 from lifelines.utils import concordance_index
-
+import numpy as np
 class Classification: 
 
     def __init__(self, average='weighted', titles=None):
@@ -102,15 +102,26 @@ class ClassificationOnTheFly:
 class Survival:
 
     def __init__(self):
+        self.c_index = -1
         self.survival_time = []
         self.risk_score = []
+        self.events = []
         pass
     
-    def add_data(self, survival_time, risk_score): 
+    def add_data(self, survival_time, risk_score, events): 
         self.survival_time += survival_time
         self.risk_score += risk_score
+        self.events += events
        
     def update_metrics(self):
-        self.c_index = concordance_index(self.survival_time, self.risk_score)
-        print(f"C-index: {self.c_index:.4f}")
+        
+        filter = (np.array(self.events) == 1)
+        filtered_times = np.array(self.survival_time)[filter]
+        filtered_scores = np.array(self.risk_score)[filter]
+
+        self.c_index = concordance_index(filtered_times, -filtered_scores)
+        
         return self.c_index
+
+    def print(self):
+        print(f"C-index: {self.c_index:.4f}")

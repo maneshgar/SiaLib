@@ -138,14 +138,23 @@ def compute_grad_norm(grads):
 
 def plot_grads_hist(grads, wandb_prefix):
     # Log histograms of gradients per layer
-    grad_histograms = {}
-    flat_grads = jax.tree_util.tree_flatten_with_path(grads)
-    
-    for path, grad in flat_grads[0]:  # flat_grads[0] contains (path, value) tuples
-        if grad is not None:  # Some params might not have gradients
-            # Convert path (a tuple of keys) into a readable name
-            name = "/".join(str(k) for k in path)  
-            grad_histograms[f"{wandb_prefix}-grad/{name}"] = wandb.Histogram(grad.flatten())
-    
-    return grad_histograms
+    try: 
+        grad_histograms = {}
+        flat_grads = jax.tree_util.tree_flatten_with_path(grads)
+        
+        for path, grad in flat_grads[0]:  # flat_grads[0] contains (path, value) tuples
+            if grad is not None:  # Some params might not have gradients
+                if jnp.isnan(grad).any():
+                    print(f"Warning: NaN detected in gradients of {path}")
+                    return None # Skip this gradient to prevent errors
+                
+                # Convert path (a tuple of keys) into a readable name
+                name = "/".join(str(k) for k in path)  
+                grad_histograms[f"{wandb_prefix}-grad/{name}"] = wandb.Histogram(grad.flatten())
+        
+        return grad_histograms
+    except:
+        print("Warning:: plot grads hist failed!")
+        return None
+        
     

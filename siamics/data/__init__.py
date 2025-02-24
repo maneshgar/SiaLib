@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
 from siamics.utils import futils
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GroupShuffleSplit
 
 def get_common_genes(reference_data, target_data, ignore_subids=True, keep_duplicates=False):
     if ignore_subids:
@@ -30,12 +30,12 @@ def pad_dataframe(reference_data, target_data, pad_token=0):
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, ctname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, meta_modes=[]):
+    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, meta_modes=[]):
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
         self.metdata=meta_modes
-        self.ctname = ctname
+        self.catname = catname
 
         self.data_mode="raw"
         if embed_name: self.data_mode="features"
@@ -134,9 +134,28 @@ class Data(Dataset):
         self.validset = validset.reset_index(drop=True)
         self.testset  = testset.reset_index(drop=True)
 
-        self.save(self.trainset, 'catalogue_train.csv')
-        self.save(self.validset, 'catalogue_valid.csv')
-        self.save(self.testset, 'catalogue_test.csv')
+        self.save(self.trainset, f'{self.catname}_train.csv')
+        self.save(self.validset, f'{self.catname}_valid.csv')
+        self.save(self.testset , f'{self.catname}_test.csv')
+        
+        return self.trainset, self.validset, self.testset
+
+    def _split_catalogue_grouping(self, y_colname, groups_colname): #y: cancer_type, GEO: group_id , TCGA: patient_id
+        # Initial split for train and temp (temp will later be split into validation and test)
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.1, random_state=42)  # 70% train, 30% temp
+        train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue[y_colname].tolist(), groups=self.catalogue[groups_colname].tolist()))
+        tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
+        self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
+
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=43)
+        valid_idx, test_idx = next(gss.split(X=tempset.index.tolist(), y=tempset[y_colname].tolist(), groups=tempset[groups_colname].tolist()))
+
+        self.validset = tempset.iloc[valid_idx].reset_index(drop=True) 
+        self.testset = tempset.iloc[test_idx].reset_index(drop=True)
+
+        self.save(self.trainset, f'{self.catname}_train.csv')
+        self.save(self.validset, f'{self.catname}_valid.csv')
+        self.save(self.testset, f'{self.catname}_test.csv')
         
         return self.trainset, self.validset, self.testset
         
@@ -147,7 +166,7 @@ class Data(Dataset):
         if abs_path: 
             df = self.load(abs_path=abs_path, sep=',', index_col=0)
         else: 
-            df = self.load(rel_path='catalogue.csv', sep=',', index_col=0)
+            df = self.load(rel_path=f'{self.catname}.csv', sep=',', index_col=0)
         
         if types:
             df = df[df['cancer_type'].isin(types)]
@@ -157,9 +176,9 @@ class Data(Dataset):
         return self.catalogue
 
     def get_subsets(self, types=None, ):
-        df_train = self.load(rel_path='catalogue_train.csv', sep=',', index_col=0)
-        df_valid = self.load(rel_path='catalogue_valid.csv', sep=',', index_col=0)
-        df_test  = self.load(rel_path='catalogue_test.csv' , sep=',', index_col=0)
+        df_train = self.load(rel_path=f'{self.catname}_train.csv', sep=',', index_col=0)
+        df_valid = self.load(rel_path=f'{self.catname}_valid.csv', sep=',', index_col=0)
+        df_test  = self.load(rel_path=f'{self.catname}_test.csv' , sep=',', index_col=0)
 
         if types:
             df_train = df_train[df_train['cancer_type'].isin(types)].reset_index(drop=True)

@@ -12,7 +12,7 @@ from siamics.data import tcga
 
 def test_tcga():
     tcgaa = tcga.TCGA()
-    tcgaa._split_catalogue()
+    tcgaa._split_catalogue_grouping(y_colname='cancer_type', groups_colname='patient_id') # TODO split by grouping.
     tcgaa.count_data()
 
 test_tcga()

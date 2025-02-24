@@ -1,4 +1,4 @@
-from siamics.data import tcga   
+from siamics.data import tcga
 
 def import_from_server(cancer_type=None):
     roots=["/projects/AIM/TCGA/", "/projects/ovcare/classification/TCGA/"]
@@ -20,12 +20,20 @@ def generate_ensg(raw_dir, data_dir, cancer_type=None):
     dataset = tcga.TCGA()
     dataset.gen_ensg(raw_dir, data_dir, cancer_type=cancer_type)
 
-raw_dir = 'raw_data'
-data_dir = 'data'
+def gen_tcga_surv():
+    dataset = tcga.TCGA_SURV()
+    dataset._gen_catalogue()
 
-import_from_server()
-generate_catalogue(raw_dir, ext='.tsv')
-generate_ensg(raw_dir, data_dir, cancer_type=['LUSC'])
-generate_catalogue(data_dir)
+
+# raw_dir = 'raw_data'
+# data_dir = 'data'
+
+# import_from_server()
+# generate_catalogue(raw_dir, ext='.tsv')
+# generate_ensg(raw_dir, data_dir, cancer_type=['LUSC'])
+# generate_catalogue(data_dir)
 
 # run_data_loader()
+
+# TCGA SURV
+gen_tcga_surv()
