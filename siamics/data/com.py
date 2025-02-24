@@ -5,7 +5,18 @@ from . import Data
 class Com(Data):
     def __init__(self, catalogue=None, root=None, embed_name=None, augment=False):
         super().__init__("Com", catalogue=catalogue, root=root, embed_name=embed_name, augment=augment)
-        self.trainset, self.validset, self.testset = self._split_catalogue()
+        train_path = os.path.join(self.root, "catalogue_train.csv")
+        valid_path = os.path.join(self.root, "catalogue_valid.csv")
+        test_path  = os.path.join(self.root, "catalogue_test.csv")
+
+        if os.path.exists(train_path) and os.path.exists(valid_path) and os.path.exists(test_path):
+            print("Loading existing train/valid/test splits...")
+            self.trainset = pd.read_csv(train_path, index_col=0)
+            self.validset = pd.read_csv(valid_path, index_col=0)
+            self.testset  = pd.read_csv(test_path, index_col=0)
+        else:
+            print("Splitting dataset into train/valid/test sets...")
+            self.trainset, self.validset, self.testset = self._split_catalogue()
 
         self.classes = [
             "B_prop", "CD4_prop", "CD8_prop", "NK_prop", "neutrophil_prop",
@@ -55,11 +66,12 @@ class Com(Data):
 
     def _gen_catalogue(self):
 
-        labels_path = "/projects/ovcare/classification/tzhang/data/immune_deconv/Admixture_Proportions.xlsx"
+        labels_path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Admixture_Proportions.xlsx"
 
-        #get sample info from in vitro + in silico samples
+        #get sample info from in vitro + in silico + generated samples 
         invitro_coarse = pd.read_excel(labels_path, sheet_name="InVitroCoarse")
         insilico_fine = pd.read_excel(labels_path, sheet_name="InSilicoFine")
+        generated = pd.read_excel(labels_path, sheet_name="singleCell")
         insilico_coarse = self.fine_to_coarse(insilico_fine)
 
         #collect sample ids and expression file paths
@@ -90,11 +102,18 @@ class Com(Data):
             }
             for (dataset_name, sample_id), group in insilico_coarse.groupby(["dataset.name", "sample.id"])
         }
+        # for generated samples
+        generated = generated.drop(columns=["cell_barcodes"], errors="ignore") 
+        generated.set_index("sample_id", inplace=True)
+        cell_prop_map_generated = generated.to_dict(orient="index")
 
         #create separate lists for cancer types and prop of different cell types
         cancer_type_list = [
             cancer_type_map_insilico.get(tuple(sid.split('_', 1)), "N/A") 
-            if '_' in sid else cancer_type_map_invitro.get(sid, "N/A") 
+            if '_' in sid else 
+            cancer_type_map_invitro.get(sid, "N/A") 
+            if sid in cancer_type_map_invitro else 
+            cell_prop_map_generated.get(sid, "N/A")  
             for sid in sid_list
         ]
        
@@ -106,8 +125,15 @@ class Com(Data):
 
         for cell_type in cell_types:
             cell_prop_lists[cell_type] = [
-                cell_prop_map_insilico.get(tuple(sid.split('_', 1)), {}).get(cell_type, "0")
-                if '_' in sid else cell_prop_map_invitro.get(sid, {}).get(cell_type, "0")
+                # Process generated samples: if sid contains _ and starts with a number
+                cell_prop_map_generated[sid].get(cell_type, "0")
+                if ('_' in sid and sid[0].isdigit() and sid in cell_prop_map_generated) else (                   
+                    cell_prop_map_insilico.get(tuple(sid.split('_', 1)), {}).get(cell_type, "0")
+                    if '_' in sid else (
+                        cell_prop_map_invitro.get(sid, {}).get(cell_type, "0")
+                        if sid in cell_prop_map_invitro else "0"
+                    )
+                )
                 for sid in sid_list
             ]
 
@@ -145,6 +171,6 @@ class Com(Data):
         else: 
             model_name = fm_config_name
 
-        return f'/projects/ovcare/classification/tzhang/data/immune_deconv/Com/features/{model_name}/{os.path.basename(path)[:-3]}pkl'
+        return f'/projects/ovcare/users/tina_zhang/data/immune_deconv/Com/features/{model_name}/{os.path.basename(path)[:-3]}pkl'
     
     

@@ -17,7 +17,7 @@ def convert_to_single_file_ensg_pickle(root, xml_fname):
  
 def generate_catalogue(dataset):
     dataset._gen_catalogue()
-    dataset._split_catalogue_grouping(y_colname'cancer_type', groups_colname='group_id') # TODO call grouping
+    dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping
 
 geo_brca = geo.GEO_BRCA()
 geo_blca = geo.GEO_BLCA()

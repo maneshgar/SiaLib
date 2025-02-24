@@ -10,26 +10,26 @@ from siamics.utils import singleCell
 
 class ImmuneSim:
     def __init__(self, celltypes=None, rootdir = None):
-        self.all_celltypes = ['B', 'CD4', 'CD8', 'NK', 'neutrophil', 'monocytic', 'fibroblasts', 'endothelial', 'others']
+        self.all_celltypes = ['B.cells', 'CD4.T.cells', 'CD8.T.cells', 'NK.cells', 'neutrophils', 'monocytic.lineage', 'fibroblasts', 'endothelial.cells', 'others']
         if celltypes:
             self.celltypes = celltypes
         else: 
             self.celltypes = self.all_celltypes        
 
-        self.label_path = "/projects/ovcare/classification/tzhang/data/immune_deconv/Admixture_Proportions.xlsx"
+        self.label_path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Admixture_Proportions.xlsx"
         self.label_sheet = "singleCell"
         
         if rootdir:
             self.rootdir = rootdir
         else:
-            self.rootdir = "/projects/ovcare/classification/tzhang/data/immune_deconv/single-cell/Bulk"
+            self.rootdir = "/projects/ovcare/users/tina_zhang/data/immune_deconv/single-cell/Bulk"
         os.makedirs(self.rootdir, exist_ok=True)
 
     def gen_proportion(self, nsample, cellcount = 500):
         sample_ids = []
         proportions = pd.DataFrame(columns=['sample_id', 'cell_barcodes'] + self.all_celltypes)
 
-        annotations = pd.read_csv("/projects/ovcare/classification/tzhang/data/immune_deconv/single-cell/Zheng68k_filtered/68k_pbmc_barcodes_annotation.tsv", sep="\t")
+        annotations = pd.read_csv("/projects/ovcare/users/tina_zhang/data/immune_deconv/single-cell/Zheng68k_filtered/68k_pbmc_barcodes_annotation.tsv", sep="\t")
 
         # Load existing sample IDs from the Excel file if it exists
         try:
@@ -107,7 +107,7 @@ class ImmuneSim:
         return aggregated_df
 
     def tpm(self, expression):
-        path = "/projects/ovcare/classification/tzhang/data/immune_deconv/Human.GRCh38.p13.annot.tsv" #Taken from GEO
+        path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Human.GRCh38.p13.annot.tsv" #Taken from GEO
         gene_annotation = pd.read_csv(path, sep="\t")
         gene_lengths = dict(zip(gene_annotation["EnsemblGeneID"], gene_annotation["Length"]))
 
