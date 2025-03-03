@@ -1,10 +1,14 @@
+import os
 from sklearn import metrics 
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+from lifelines import KaplanMeierFitter
 from lifelines.utils import concordance_index
+from lifelines.statistics import logrank_test
 import numpy as np
 from scipy.stats import pearsonr
+from .futils import create_directories
 
 class Classification: 
 
@@ -14,7 +18,7 @@ class Classification:
         self.preds = []
         self.titles = titles
 
-    def gen_heatmap(self):
+    def gen_heatmap(self, out_dir, filename="confusion_matrix.png"):
         # Create the heatmap
         plt.figure(figsize=(8, 6))
         sns.heatmap(self.cm, annot=True, fmt="d", cmap="Blues", cbar=True, xticklabels=self.titles, yticklabels=self.titles)
@@ -25,8 +29,11 @@ class Classification:
         plt.title('Confusion Matrix')
 
         # Save plot as image
-        plt.savefig("confusion_matrix.png")
+        create_directories(out_dir)
+        plt_path = os.path.join(out_dir, filename)
+        plt.savefig(plt_path)
         plt.close()
+        return plt_path
 
     def get_groundTruth(self):
         return self.lbls
@@ -125,8 +132,75 @@ class Survival:
         self.c_index = concordance_index(filtered_times, -filtered_scores)
         
         return self.c_index
+    
+    def plot_KM(self, out_dir, filename="km_plot.png"):
+        """
+        Plots Kaplan-Meier survival curves for high-risk and low-risk groups.
 
-    def print(self):
+        Parameters:
+        - survival_time (array-like): Time until the event or censoring.
+        - risk_score (array-like): Risk score to stratify high- and low-risk groups.
+        - events (array-like): Binary event indicator (1 = event occurred, 0 = censored).
+
+        Returns:
+        - A Kaplan-Meier survival plot comparing high-risk and low-risk groups.
+        """
+
+        # Convert to numpy arrays
+        survival_time = np.array(self.survival_time)
+        risk_score = np.array(self.risk_score)
+        events = np.array(self.events)
+
+        key = random.PRNGKey(42)  # JAX requires a key for randomness
+        risk_score = random.uniform(key, shape=survival_time.shape)
+
+        # Define high- and low-risk groups using the median risk score
+        median_risk = np.median(risk_score)
+        high_risk_idx = risk_score >= median_risk
+        low_risk_idx = risk_score < median_risk
+
+        # Fit Kaplan-Meier survival curves
+        kmf_high = KaplanMeierFitter()
+        kmf_low = KaplanMeierFitter()
+
+        plt.figure(figsize=(8, 6))
+
+        # Fit and plot high-risk group
+        kmf_high.fit(survival_time[high_risk_idx], events[high_risk_idx], label="High Risk")
+        kmf_high.plot_survival_function(color="red", linestyle="--")
+
+        # Fit and plot low-risk group
+        kmf_low.fit(survival_time[low_risk_idx], events[low_risk_idx], label="Low Risk")
+        kmf_low.plot_survival_function(color="blue", linestyle="-")
+
+        # Perform log-rank test
+        results = logrank_test(
+            survival_time[high_risk_idx], survival_time[low_risk_idx],
+            event_observed_A=events[high_risk_idx], event_observed_B=events[low_risk_idx]
+        )
+        
+        p_value = results.p_value
+
+        # Customize the plot
+        plt.title(f"Kaplan-Meier Survival Curve (p = {p_value:.4f})")
+        plt.xlabel("Time")
+        plt.ylabel("Survival Probability")
+        plt.legend()
+        plt.grid(True)
+
+        # Ensure save directory exists
+        create_directories(out_dir)
+        plot_path = os.path.join(out_dir, filename)
+
+        # Save the plot
+        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
+        plt.close()  # Close the plot to free memory
+
+        return plot_path, p_value  # Return the file path and p-value
+        
+    def print(self, update=True):
+        if update:
+            self.update_metrics()
         print(f"C-index: {self.c_index:.4f}")
         return self.c_index
     

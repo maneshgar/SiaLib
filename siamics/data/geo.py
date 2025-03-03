@@ -34,28 +34,6 @@ class GEO(Data):
         relpath = self.organisms_dir[self.organism]
         super().__init__("GEO", catalogue=catalogue, catname=catname, relpath=relpath, root=root, embed_name=embed_name, augment=augment, meta_modes=meta_modes)
 
-    def __getitem__(self, idx):
-        pkl_name = self.catalogue.loc[idx, 'filename']
-
-        # if embeddings are available
-        if self.embed_name:
-            epath = self.get_embed_fname(pkl_name)
-            with open(os.path.join(self.root, epath), 'rb') as f:
-                data = pickle.load(f)
-        else:
-            # load the item and geneIDs
-            try: 
-                data = self.load_pickle(pkl_name)
-            except: 
-                gsm = pkl_name.split(sep="/")[3][:-4]
-                new_filename=os.path.join(pkl_name.split(sep="/")[1], pkl_name.split(sep="/")[2]+".tsv.gz")
-                data = self.load(new_filename, usecols=[self.geneID, gsm], proc=True)
-                futils.create_directories(new_filename)
-                print(f"Saving:: {pkl_name}")
-                data.to_pickle(os.path.join(self.root, pkl_name))
-
-        return data, None, idx
-        
     def _convert_to_ensg(self, df):
         reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')
         reference = pd.read_csv(reference_path, sep="\t", usecols=['GeneID', 'EnsemblGeneID'])

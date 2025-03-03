@@ -6,7 +6,7 @@ def create_cosine_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=
     total_steps = num_epochs * steps_per_epoch
     
     if warmup:
-        warmup_steps = min(5000, total_steps // 5)
+        warmup_steps = total_steps // 5
         const_steps  = max(0, (total_steps) // 5)
         cosine_steps = max(0, total_steps - (warmup_steps + const_steps))
 

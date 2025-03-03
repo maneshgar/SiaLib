@@ -9,7 +9,6 @@ def download_from_website(root, xml_fname):
     dataset.download(root, format="FPKM", xml_fname=xml_fname)
     dataset.download(root, format="SOFT", xml_fname=xml_fname)
 
-
 def convert_to_single_file_ensg_pickle(root, xml_fname):
     dataset = geo.GEO(root=root)
     dataset.root = os.path.join(root, "raw_data")

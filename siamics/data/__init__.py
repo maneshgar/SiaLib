@@ -5,18 +5,25 @@ from torch.utils.data import Dataset
 from siamics.utils import futils
 from sklearn.model_selection import train_test_split, GroupShuffleSplit
 
-def get_common_genes(reference_data, target_data, ignore_subids=True, keep_duplicates=False):
+def remove_subids(data):
+    data.columns = [item.split(".")[0] for item in data.columns]
+    data = data.T.groupby(level=0).mean().T
+    # data = data.loc[:,~data.columns.duplicated()]
+    return data
+    
+def get_common_genes(reference_data, target_data, ignore_subids=False, keep_duplicates=False):
     if ignore_subids:
         reference_data.columns = [item.split(".")[0] for item in reference_data.columns]
         target_data.columns = [item.split(".")[0] for item in target_data.columns]
+    
     common_genes = reference_data.columns.intersection(target_data.columns)  # Find common genes
 
     if keep_duplicates:
         return common_genes, target_data
 
-    target_data = target_data.loc[:,~target_data.columns.duplicated()].reset_index(drop=True)
-    target_data = target_data[common_genes]
-
+    target_data = target_data.T.groupby(level=0).mean().T
+    # target_data = target_data.loc[:,~target_data.columns.duplicated()] # Just double check.
+    target_data = target_data[common_genes].fillna(0) # TODO: make sure we dont cover any bug with this. 
     return common_genes, target_data
 
 def pad_dataframe(reference_data, target_data, pad_token=0):
@@ -40,6 +47,7 @@ class Data(Dataset):
         self.data_mode="raw"
         if embed_name: self.data_mode="features"
         self.valid_modes=['raw', 'features']
+        self.remove_subids = True
 
         # Wehter to use default root or given root. 
         if root: 
@@ -80,6 +88,10 @@ class Data(Dataset):
         if self.data_mode == 'raw':
             file_path = self.catalogue.loc[idx, 'filename']
             data = self.load_pickle(file_path)
+
+            if self.remove_subids:
+                data = remove_subids(data)
+                
             if self.augment and np.random.rand() < 0.5:
                 print(f"Augmenting data Before: {data.columns}")
                 data = data.sample(frac=1, axis=1).reset_index(drop=True)
@@ -289,13 +301,13 @@ class DataWrapper(Dataset):
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
         if subset == 'full':
-            self.datasets = [self.datasets_cls[index](dataset.catalogue, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
-            self.datasets = [self.datasets_cls[index](dataset.trainset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'validset':
-            self.datasets = [self.datasets_cls[index](dataset.validset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
-            self.datasets = [self.datasets_cls[index](dataset.testset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
         else:
             raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'train', 'valid', or 'test'.")
 
@@ -303,7 +315,7 @@ class DataWrapper(Dataset):
         if sub_sampled:
             print("Warning:: loading a sub-sampled dataset. ")
             for d in self.datasets:
-                d.catalogue = d.catalogue[:128]
+                d.catalogue = d.catalogue[:512]
 
         self.lengths = [len(dataset) for dataset in self.datasets]
         self.cumulative_lengths = np.cumsum(self.lengths)

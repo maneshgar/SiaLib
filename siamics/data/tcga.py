@@ -124,12 +124,12 @@ class TCGA(Data):
 class TCGA5(TCGA):
     def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
         cancer_types = ['BRCA', 'BLCA', ['GBM','LGG'], 'LUAD', 'UCEC'] # BRCA, BLCA, GBMLGG, LUAD, and UCEC
-        super().__init__(catalogue, cancer_types, root, meta_modes, embed_name, augment)
+        super().__init__(catalogue=catalogue, cancer_types=cancer_types, root=root, meta_modes=meta_modes, embed_name=embed_name, augment=augment)
 
 class TCGA6(TCGA):
     def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
         cancer_types = ['BRCA', 'THCA', 'GBM', 'LGG', 'LUAD', 'UCEC']
-        super().__init__(catalogue, cancer_types, root, meta_modes, embed_name, augment)
+        super().__init__(catalogue=catalogue, cancer_types=cancer_types, root=root, meta_modes=meta_modes, embed_name=embed_name, augment=augment)
 
 class TCGA_SURV(TCGA):
 
@@ -137,16 +137,16 @@ class TCGA_SURV(TCGA):
         self.subset="SURV"
         super().__init__(catalogue=catalogue, catname=catname, cancer_types=cancer_types, root=root, meta_modes=meta_modes, embed_name=embed_name, augment=augment)
 
-    def _read_survival_metadata(self, catalogue, dir="survival", dropnan=True):
-        survival_files = glob(os.path.join(self.root, dir, "*.txt"))
+    def _read_survival_metadata(self, catalogue, dir="clinical_data", dropnan=True):
+        survival_files = glob(os.path.join(self.root, dir, "*.tsv"))
         survival_list = []
         for file in survival_files:
             df = self.load(abs_path=file, sep="\t", index_col=None)
-            survival_list.append(df[['_PATIENT', 'OS', 'OS.time', 'PFI', 'PFI.time']])
+            survival_list.append(df[['Patient ID', 'Overall Survival (Months)', 'Overall Survival Status', 'Progress Free Survival (Months)', 'Progression Free Status']])
 
         survival_data = pd.concat(survival_list, ignore_index=True)
-        catalogue = catalogue.merge(survival_data, how='left', left_on='patient_id', right_on='_PATIENT')
-        catalogue = catalogue.drop(columns=["_PATIENT"])
+        catalogue = catalogue.merge(survival_data, how='left', left_on='patient_id', right_on='Patient ID')
+        catalogue = catalogue.drop(columns=["Patient ID"])
         if dropnan:
             catalogue = catalogue.dropna()
         return catalogue.reset_index(drop=True)
@@ -157,5 +157,9 @@ class TCGA_SURV(TCGA):
         self.save(self.catalogue, f'{self.catname}.csv')
         self._split_catalogue()
 
-        
+class TCGA_SURV5(TCGA_SURV):
+    def __init__(self, catalogue=None, catname="catalogue_surv", cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
+        cancer_types = ['BLCA', 'LUAD', 'OV', 'COAD', 'UCEC']
+        super().__init__(catalogue, catname, cancer_types, root, meta_modes, embed_name, augment)
+
 
