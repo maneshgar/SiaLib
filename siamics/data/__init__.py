@@ -59,22 +59,16 @@ class Data(Dataset):
         if root: 
             self.root = os.path.join(root, name)
         else: 
-            self.datasets_path = "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/"
+            self.datasets_path = "/projects/ovcare/users/tina_zhang/data/"
             self.root= os.path.join(self.datasets_path, name, relpath)
         
         # Wether to use default Catalogue or provided ones. 
         if catalogue is None:
             # Default catalogue
             try:
-                if name == "DepMap":
-                    self.get_catalogue()
-                    self.get_subsets()
-                    self.catalogue = self.catalogue.reset_index(drop=True)
-                else:
-                    self.get_catalogue(types=cancer_types)
-                    self.get_subsets(types=cancer_types)
-                    self.catalogue = self.catalogue.reset_index(drop=True)
-
+                self.get_catalogue(types=cancer_types)
+                self.get_subsets(types=cancer_types)
+                self.catalogue = self.catalogue.reset_index(drop=True)
             except:
                 print(f"Warning: {self.name} catalogue has not been generated yet!")
 
