@@ -151,9 +151,6 @@ class Survival:
         risk_score = np.array(self.risk_score)
         events = np.array(self.events)
 
-        key = random.PRNGKey(42)  # JAX requires a key for randomness
-        risk_score = random.uniform(key, shape=survival_time.shape)
-
         # Define high- and low-risk groups using the median risk score
         median_risk = np.median(risk_score)
         high_risk_idx = risk_score >= median_risk

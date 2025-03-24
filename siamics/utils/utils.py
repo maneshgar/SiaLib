@@ -65,7 +65,6 @@ def plot_umap(
     else:
         plt.scatter(umap_embedding[:, 0], umap_embedding[:, 1], **scatter_args)
         
-
     # Step 3: Save the plot to disk if save_path is specified
     if save_path:
         create_directories(save_path)
@@ -94,3 +93,36 @@ def plot_hist(data):
     plt.title("Histogram of Binned Token Frequencies")
     plt.xticks(np.arange(0, 65, step=5))  # Adjust ticks for readability
     plt.savefig("plt.png")
+
+class RunningStats:
+    def __init__(self):
+        self.count = 0
+        self.mean = 0.0
+        self.M2 = 0.0  # Variance accumulator
+
+    def update_batch(self, batch):
+        """Updates running mean and std using a batch of data."""
+        batch = np.array(batch)  # Ensure it's a NumPy array
+        batch_size = len(batch)
+        new_count = self.count + batch_size
+
+        batch_mean = np.mean(batch, axis=0)
+        batch_var = np.var(batch, ddof=0, axis=0)  # Variance without Bessel correction
+
+        # Compute delta between old mean and new batch mean
+        delta = batch_mean - self.mean
+
+        # Update running mean
+        self.mean += (delta * batch_size) / new_count
+
+        # Update variance accumulator M2
+        self.M2 += batch_var * batch_size + (delta ** 2) * (self.count * batch_size) / new_count
+
+        # Update count
+        self.count = new_count
+
+    def get_mean(self):
+        return self.mean
+
+    def get_std(self):
+        return np.sqrt(self.M2 / self.count) if self.count > 1 else 0.0  # Population std (ddof=0)

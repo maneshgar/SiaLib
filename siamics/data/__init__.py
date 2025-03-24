@@ -35,6 +35,12 @@ def pad_dataframe(reference_data, target_data, pad_token=0):
     target_data = target_data[reference_data.columns]
     return target_data
 
+def drop_sparse_data(catalogue, stats, nb_genes, threshold=0.5):
+    zeros_thresh = threshold * nb_genes
+    cat = catalogue.merge(stats[['group_id', 'sample_id', 'zeros_count']], on=['group_id', 'sample_id'])
+    filter = cat['zeros_count'] < zeros_thresh 
+    return cat[filter].drop('zeros_count', axis=1).reset_index()
+
 class Data(Dataset):
 
     def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, meta_modes=[]):
@@ -103,32 +109,28 @@ class Data(Dataset):
             data = self.load_pickle(file_path)
 
         # Getting label 
-        try: 
-            metadata = self.catalogue.loc[idx:idx]
-        except: 
-            metadata = None
+        metadata = self.catalogue.loc[idx:idx]
         
         return data, metadata, idx
     
-    def collate_fn(self, batch, num_devices=None, metadata=False):
-        meta = None
+    def collate_fn(self, batch, num_devices=None):
         data = []
-        if metadata: meta = []
+        meta = []
         idx = []
         for i in range(len(batch)):
             data.append(batch[i][0])
-            if metadata: meta.append(batch[i][1])
+            meta.append(batch[i][1])
             idx.append(batch[i][2])
 
         # if number of devices is given, the batch will be padded to fit all devices. 
         if num_devices:
             while len(data) % num_devices != 0:
                 data.append(batch[0][0])
-                if metadata: meta.append(batch[0][1])
+                meta.append(batch[0][1])
                 idx.append(-1)
 
         data_df = pd.concat(data)
-        if metadata: meta = pd.concat(meta)
+        meta = pd.concat(meta)
         idx = np.array(idx)
         return data_df, meta, idx
 
@@ -152,9 +154,9 @@ class Data(Dataset):
         
         return self.trainset, self.validset, self.testset
 
-    def _split_catalogue_grouping(self, y_colname, groups_colname): #y: cancer_type, GEO: group_id , TCGA: patient_id
+    def _split_catalogue_grouping(self, y_colname, groups_colname, test_size=0.1): #y: cancer_type, GEO: group_id , TCGA: patient_id
         # Initial split for train and temp (temp will later be split into validation and test)
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.1, random_state=42)  # 70% train, 30% temp
+        gss = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=42)  # 70% train, 30% temp
         train_idx, temp_idx = next(gss.split(X=self.catalogue.index.tolist(), y=self.catalogue[y_colname].tolist(), groups=self.catalogue[groups_colname].tolist()))
         tempset = self.catalogue.iloc[temp_idx].reset_index(drop=True) 
         self.trainset = self.catalogue.iloc[train_idx].reset_index(drop=True) 
@@ -171,6 +173,13 @@ class Data(Dataset):
         
         return self.trainset, self.validset, self.testset
         
+    def _apply_filter(self, organism= None, save_to_file=False): 
+        if organism:
+            self.catalogue = self.catalogue[self.catalogue['organism'].isin(organism)].reset_index(drop=True)
+        if save_to_file:
+            self.save(self.catalogue, f'{self.catname}.csv')
+        return self.catalogue
+    
     def get_gene_id(self):
        return self.geneID
     
@@ -277,9 +286,9 @@ class Data(Dataset):
         file_path = os.path.join(self.root, rel_path)
         
         if os.path.isfile(file_path) and not overwrite:
-            print(f"Skipping, file already exists: {file_path}")
+            print(f"To_pickle::skipping:file already exists: {file_path}")
         else:
-            print(f"Saving to file: {file_path}")
+            print(f"To_pickle::saving: {file_path}")
             futils.create_directories(file_path)
             data.to_pickle(file_path)
 
@@ -352,6 +361,27 @@ class DataWrapper(Dataset):
         # Return the sample from the appropriate dataset
         return self.datasets[dataset_idx][sample_idx]
 
+    def collate_fn(self, batch, num_devices=None):
+        data = []
+        meta = []
+        idx = []
+        for i in range(len(batch)):
+            data.append(batch[i][0])
+            meta.append(batch[i][1])
+            idx.append(batch[i][2])
+
+        # if number of devices is given, the batch will be padded to fit all devices. 
+        if num_devices:
+            while len(data) % num_devices != 0:
+                data.append(batch[0][0])
+                meta.append(batch[0][1])
+                idx.append(-1)
+
+        data_df = pd.concat(data)
+        meta = pd.concat(meta)
+        idx = np.array(idx)
+        return data_df, meta, idx
+
     def get_active_dataset(self, idx):
         dataset_idx = np.searchsorted(self.cumulative_lengths, idx, side='right')
         return self.datasets[dataset_idx], dataset_idx
@@ -373,28 +403,6 @@ class DataWrapper(Dataset):
     def set_data_mode(self, mode):
         for dataset in self.datasets:
             dataset.set_data_mode(mode)
-
-    def collate_fn(self, batch, num_devices=None, metadata=False):
-        meta = None
-        data = []
-        if metadata: meta = []
-        idx = []
-        for i in range(len(batch)):
-            data.append(batch[i][0])
-            if metadata: meta.append(batch[i][1])
-            idx.append(batch[i][2])
-
-        # if number of devices is given, the batch will be padded to fit all devices. 
-        if num_devices:
-            while len(data) % num_devices != 0:
-                data.append(batch[0][0])
-                if metadata: meta.append(batch[0][1])
-                idx.append(-1)
-
-        data_df = pd.concat(data)
-        if metadata: meta = pd.concat(meta)
-        idx = np.array(idx)
-        return data_df, meta, idx
 
     def gen_common_genes_sample_file(self, out_path=None):
         samples = []

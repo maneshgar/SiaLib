@@ -1,15 +1,15 @@
-import requests
-import os, pickle, re
+import requests, threading
+import os, re, pickle
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import logging
 import pandas as pd
-from sklearn.model_selection import GroupShuffleSplit
-import numpy as np
+import GEOparse
+import logging
 
 from . import Data
 from . import futils
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class GEO(Data):
 
@@ -23,7 +23,8 @@ class GEO(Data):
         self.type_suffix={'RAW':'_raw_counts_GRCh38.p13_NCBI.tsv.gz',
                           'TPM':'_norm_counts_TPM_GRCh38.p13_NCBI.tsv.gz',
                           'FPKM':'_norm_counts_FPKM_GRCh38.p13_NCBI.tsv.gz',
-                          'META':'_family.soft.gz'}
+                          'SOFT':'_family.soft.gz',
+                          'MINIML':'_family.xml.tgz'}
 
         if organism in self.organisms_dir.keys(): self.organism=organism
         else: raise ValueError
@@ -116,7 +117,9 @@ class GEO(Data):
             elif format == "SOFT":
                 file= f"{gse_id}_family.soft.gz"
                 url = f"https://ftp.ncbi.nlm.nih.gov/geo/series/{gse_id[:-3]}nnn/{gse_id}/soft/{file}"
-                
+            elif format == "MINIML":
+                file= f"{gse_id}_family.xml.tgz"
+                url = f"https://ftp.ncbi.nlm.nih.gov/geo/series/{gse_id[:-3]}nnn/{gse_id}/miniml/{file}"
             else: 
                 error_logger.error(f"Invalid file format! ({format})")
                 return
@@ -176,75 +179,139 @@ class GEO(Data):
             total += df.shape[1]
         return total
     
-    def _gen_catalogue(self, experiments=[], type="exc", dname_postfix=None):
-        gid_list = [] 
-        sid_list = [] 
+    def _gen_catalogue(self, file_path="list_gsmfiles.pkl", experiments=[], type="exc", dname_postfix=None, sparsity=0.5, organism=["Homo sapiens"]):
+        gseid_list = [] 
+        gsmid_list = [] 
         fnm_list = [] 
-        
-        files = futils.list_files(os.path.join(self.root, "data"), extension=".pkl", depth=4)
-        print(f"Walking found {len(files)} files.")
-        for filename in tqdm(files):
+        # Set GEOparse logging level to WARNING (hides DEBUG and INFO messages)
+        logging.getLogger("GEOparse").setLevel(logging.WARNING)
+
+        try: 
+            with open(os.path.join(self.root, file_path), "rb") as f:
+                files = pickle.load(f)
+        except: 
+            files = futils.list_files(os.path.join(self.root, "data"), extension=".pkl", depth=4)
+            print(f"Walking found {len(files)} files.")
+            with open(os.path.join(self.root, file_path), "wb") as f:
+                pickle.dump(files, f)
+
+
+        # Use a single threading lock for shared resources
+        lock = threading.Lock()
+
+        def process_file(filename, check_metadata=False):
             try: 
                 match = re.search(r"GSE\d+", filename)
                 if match:
                     gse_id = match.group()
-
                     # Check if the experiment is not excluded. 
                     if type == "exc" and gse_id in experiments:
-                        continue
+                        return
                     
                     if type == "inc" and gse_id not in experiments:
-                        continue
+                        return
                     
                     data = self.load_pickle(filename)
-                    gid_list += [gse_id]
-                    sid_list += data.index.tolist()
-                    fnm_list += [filename[len(self.root)+1:]]
+                    gsm_id = data.index.tolist()[0]
 
+                    if check_metadata:
+                        geoObj = self._get_GeoObject(gse_id)
+                        metadata = geoObj.gsms[gsm_id].metadata
+                        
+                        # Check if the organism is human
+                        if metadata['organism_ch1'] != organism:
+                            print(f"Catalogue::Skipping {gse_id}:{gsm_id}::Not a {organism}.")
+                            return
+                        
+                    # Check if it is not sparse
+                    zeros_count = (data == 0).sum().sum()
+                    if zeros_count > (data.size * sparsity):
+                        print(f"Catalogue::Skipping {gse_id}:{gsm_id}::Sparse data with {zeros_count} zeros.")
+                        return
+
+                    # Append results to shared lists in a thread-safe manner
+                    with lock:
+                        gseid_list.append(gse_id)
+                        gsmid_list.extend(data.index.tolist())
+                        fnm_list.append(filename[len(self.root)+1:])
                 else: 
-                    print(f"GSE not found, skipping file:: {filename}")
+                    print(f"Catalogue::skipping:GSE not found:: {filename}")
 
-            except: 
-                print(f"Broken File {filename}")
+            except Exception as e: 
+                print(f"Catalogue::Broken File {filename} - Error: {e}")
 
-        # works for datasets for subtasks like GEO_BRCA
-        if dname_postfix: dname = f"{self.name}_{dname_postfix}"
-        else: dname = self.name
+        # Process files in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            futures = {executor.submit(process_file, file): file for file in files}
 
-        self.catalogue= pd.DataFrame({
+            with tqdm(total=len(files), desc="Processing Files") as pbar:
+                for future in as_completed(futures):
+                    _ = future.result()  # Ensures exceptions are caught
+                    pbar.update(1)
+
+        # Set dataset name
+        dname = f"{self.name}_{dname_postfix}" if dname_postfix else self.name
+
+        # Create and save catalogue
+        self.catalogue = pd.DataFrame({
             'dataset': dname,
             'cancer_type': 'Unknown',
-            'group_id': gid_list,
-            'sample_id': sid_list,
+            'group_id': gseid_list,
+            'sample_id': gsmid_list,
+            'organism': 'Unknown',
             'filename': fnm_list
         })
         self.save(data=self.catalogue, rel_path=f"{self.catname}.csv")
+
         return self.catalogue
     
-    def extract_gsms(self, xml_path):
+    def _get_GeoObject(self, gse_id):
+        rel_path=os.path.join('softs', (gse_id+self.type_suffix['SOFT']))
+        file_path = os.path.join(self.root, rel_path)
+        return GEOparse.get_GEO(filepath=file_path)
+        
+    def get_metadata(self, gse_id, gsm_id, keys={"source_name_ch1", "organism_ch1", "characteristics_ch1", "treatment_protocol_ch1", "growth_protocol_ch1"}): # 
+        # Priority 1: organism_ch1, source_name_ch1, characteristics_ch1, treatment_protocol_ch1, growth_protocol_ch1.
+        # Priority 2: extract_protocol_ch1, data_processing, instrument_model
+        geo_obj = self._get_GeoObject(gse_id=gse_id)
+        gsm = geo_obj.gsms[gsm_id]
+        return {k: gsm.metadata[k] for k in keys if k in gsm.metadata}
+    
+    def uid_to_gseid(self, uid):
+        return f"GSE{uid[3:]}"
+    
+    def extract_gsms(self, xml_path, root, verbose=False):
         id_list = self.get_ids_from_xml(xml_path)
+
         def process_uid(uid):
             df, rp, _ = self.load_by_UID(uid, proc=False)
-            for col_name in df.columns:
-                df_ensg = self._convert_to_ensg(df[col_name])
-                pickle_path = os.path.join("pickled_Data", rp[:-16], col_name) + ".pkl"
-                self.to_pickle(df_ensg, pickle_path)
+            for gsm_str in df.columns:
+                pickle_path = os.path.join(root, "data", rp[:-16], gsm_str) + ".pkl"
+                try: 
+                    self.load_pickle(abs_path=pickle_path)
+                    if verbose: print(f"Extract_gsms::skiping:file already exist: {pickle_path}")
+                except:
+                    df_ensg = self._convert_to_ensg(df[gsm_str])
+                    self.to_pickle(df_ensg, pickle_path, overwrite=True)
+        # Run tasks in parallel
+        with ThreadPoolExecutor(max_workers=24) as executor:
+            futures = {executor.submit(process_uid, uid): uid for uid in id_list}
 
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            executor.map(process_uid, id_list)
-
+            with tqdm(total=len(id_list), desc="Processing UIDs") as pbar:
+                for future in as_completed(futures):
+                    result = future.result()  # Process completed task
+                    if result is not None:
+                        pbar.update(1)  # Update tqdm only if successful
+                        
 class GEO_BRCA(GEO):
     def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
         
         self.subset="BRCA"
         self.series = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"]
-        
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
-
+    
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
-
-        # find a way to add metadata
         return
                                                 
 class GEO_BLCA(GEO):
@@ -252,13 +319,10 @@ class GEO_BLCA(GEO):
         
         self.subset="BLCA"
         self.series = ["GSE244957", "GSE160693", "GSE154261"]
-        
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
-
-        # find a way to add metadata
         return
     
 class GEO_PACA(GEO):
@@ -285,8 +349,6 @@ class GEO_COAD(GEO):
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
-
-        # find a way to add metadata
         return
     
 class GEO_SURV(GEO):
