@@ -6,9 +6,9 @@ import numpy as np
 from lifelines import KaplanMeierFitter
 from lifelines.utils import concordance_index
 from lifelines.statistics import logrank_test
-import numpy as np
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
 from .futils import create_directories
+import jax.numpy as jnp
 
 class Classification: 
 
@@ -264,3 +264,60 @@ class ImmuneDeconv:
         plt.title("PCC Distribution")
         plt.savefig("pcc_boxplot.png")
         plt.close()
+
+class GeneEssentiality:
+    def __init__(self):
+        self.true_prob = [[]]
+        self.pred_prob = [[]]
+        self.scc = [[]]
+        self.fingerprint = []
+    
+    def add_data(self, true_p, pred_p, fingerprint): 
+        true_p = np.array(true_p)  
+        pred_p = np.array(pred_p)  
+
+        if true_p.ndim == 1:
+            true_p = true_p[:, None]
+        if pred_p.ndim == 1:
+            pred_p = pred_p[:, None]
+
+        if not hasattr(self, 'true_prob') or self.true_prob is None or isinstance(self.true_prob, list):
+            self.true_prob = np.zeros((0, true_p.shape[1])) 
+
+        if not hasattr(self, 'pred_prob') or self.pred_prob is None or isinstance(self.pred_prob, list):
+            self.pred_prob = np.zeros((0, pred_p.shape[1])) 
+
+        self.true_prob = np.vstack((self.true_prob, true_p))
+        self.pred_prob = np.vstack((self.pred_prob, pred_p))
+
+        if not hasattr(self, 'fingerprint') or self.fingerprint is None:
+            self.fingerprint = []
+    
+        if isinstance(fingerprint, list):
+            self.fingerprint.extend(fingerprint)
+        else:
+            self.fingerprint.append(fingerprint)
+
+    def update_metrics(self):
+        true_prob = jnp.array(self.true_prob)
+        pred_prob = jnp.array(self.pred_prob)
+        print(true_prob.shape)
+        print(pred_prob.shape)
+        squared_error = (pred_prob - true_prob) ** 2 
+        self.mse = np.mean(squared_error)
+        self.scc = spearmanr(self.true_prob, self.pred_prob)[0]
+        
+        # per-DepOI
+        unique_genes = np.unique(self.fingerprint)
+        gene_corrs = []
+        for gene in unique_genes:
+            indices = [i for i, g in enumerate(self.fingerprint) if g == gene]
+            indices_arr = jnp.array(indices)
+            true_vector = true_prob[indices_arr, :].flatten()
+            pred_vector = pred_prob[indices_arr, :].flatten()
+            r, _ = spearmanr(true_vector, pred_vector)
+            gene_corrs.append(r)
+
+        self.perDep_scc = np.nanmean(gene_corrs)
+
+        self.report = f"MSE: {self.mse}\nSCC: {self.scc}\nper-DepOI: {self.perDep_scc}"
