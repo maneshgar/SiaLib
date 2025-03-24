@@ -1,10 +1,12 @@
 import pandas as pd
 import os
 from . import Data
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 class DepMap(Data):
-    def __init__(self, catalogue=None, root=None, embed_name=None, augment=False):
-        super().__init__("DepMap", catalogue=catalogue, root=root, embed_name=embed_name, augment=augment)
+    def __init__(self, catalogue=None, root=None, embed_name=None, augment=False, meta_modes=[]):
+        super().__init__("DepMap", catalogue=catalogue, root=root, embed_name=embed_name, augment=augment, meta_modes=meta_modes)
 
     # filter dep file to only include genes of interest
     def dep_gene(self, dep, genes_use):
@@ -23,7 +25,28 @@ class DepMap(Data):
             row_df = pd.DataFrame([row])
             row_df.set_index("Gene Name", inplace=True)
             gene_name = row["Gene Name"]
-            row_df.to_pickle("/projects/ovcare/users/tina_zhang/data/gene_essentiality/DepMap/finger_print/{0}.pkl".format(gene_name))
+            row_df.to_pickle("/projects/ovcare/users/tina_zhang/data/DepMap/finger_print_no_pca/{0}.pkl".format(gene_name))
+
+    # generate fingerprint PC rep
+    def gen_fingerprint_PC(self, fingerprint, dep_use, n_PC=500):
+        fingerprint = pd.read_csv(fingerprint)
+        fingerprint_use = fingerprint.loc[fingerprint["Gene Name"].isin(dep_use.columns)]
+        gene_names = fingerprint_use.iloc[:,0]
+
+        X = fingerprint_use.iloc[:, 1:]
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        pca = PCA(n_components=n_PC)
+        X_pca = pca.fit_transform(X_scaled)
+
+        X_pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}' for i in range(500)])
+        X_pca_df.insert(0, 'gene', list(gene_names))
+
+        for _, row in X_pca_df.iterrows():
+            row_df = pd.DataFrame([row])
+            row_df.set_index("gene", inplace=True)
+            gene_name = row["gene"]
+            row_df.to_pickle("/projects/ovcare/users/tina_zhang/data/DepMap/finger_print/{0}.pkl".format(gene_name))
 
     # generate expression files for all cell lines with dep data for GOIs
     def gen_expression(self, exp, dep):
@@ -64,7 +87,7 @@ class DepMap(Data):
             if(sample_name in dep.index):
                 row_df.rename(columns={"Unnamed:": "sample_id"}, inplace=True)
                 row_df.set_index("sample_id", inplace=True)
-                row_df.to_pickle("/projects/ovcare/users/tina_zhang/data/gene_essentiality/DepMap/CCLE/{0}.pkl".format(sample_name))
+                row_df.to_pickle("/projects/ovcare/users/tina_zhang/data/DepMap/CCLE/{0}.pkl".format(sample_name))
 
     # check number of cell lines (cell lines in the exp file that are also in sample_info metadata and part of dep files)
     def number_of_files(dep, sample_info, condition, exp, dep_mode = "ModelID"):

@@ -60,9 +60,14 @@ class Data(Dataset):
         if catalogue is None:
             # Default catalogue
             try:
-                self.get_catalogue(types=cancer_types)
-                self.get_subsets(types=cancer_types)
-                self.catalogue = self.catalogue.reset_index(drop=True)
+                if name == "DepMap":
+                    self.get_catalogue()
+                    self.get_subsets()
+                    self.catalogue = self.catalogue.reset_index(drop=True)
+                else:
+                    self.get_catalogue(types=cancer_types)
+                    self.get_subsets(types=cancer_types)
+                    self.catalogue = self.catalogue.reset_index(drop=True)
 
             except:
                 print(f"Warning: {self.name} catalogue has not been generated yet!")
@@ -412,3 +417,10 @@ class DataWrapper(Dataset):
         
         print(f"Common genes: {len(common_genes)}")
         return common_genes, sample_file
+    
+    def get_all_sample_ids(self):
+        sample_ids = []
+        for dataset in self.datasets:
+            if 'sample_id' in dataset.catalogue.columns:
+                sample_ids.extend(dataset.catalogue['sample_id'].tolist())
+        return sample_ids
