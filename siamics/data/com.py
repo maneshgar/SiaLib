@@ -3,25 +3,14 @@ import os
 from . import Data
 
 class Com(Data):
-    def __init__(self, catalogue=None, root=None, embed_name=None, augment=False):
-        super().__init__("Com", catalogue=catalogue, root=root, embed_name=embed_name, augment=augment)
-        train_path = os.path.join(self.root, "catalogue_train.csv")
-        valid_path = os.path.join(self.root, "catalogue_valid.csv")
-        test_path  = os.path.join(self.root, "catalogue_test.csv")
-
-        if os.path.exists(train_path) and os.path.exists(valid_path) and os.path.exists(test_path):
-            print("Loading existing train/valid/test splits...")
-            self.trainset = pd.read_csv(train_path, index_col=0)
-            self.validset = pd.read_csv(valid_path, index_col=0)
-            self.testset  = pd.read_csv(test_path, index_col=0)
-        else:
-            print("Splitting dataset into train/valid/test sets...")
-            self.trainset, self.validset, self.testset = self._split_catalogue()
+    def __init__(self, catalogue=None, root=None, embed_name=None, augment=False, meta_modes=[]):
+        super().__init__("Com", catalogue=catalogue, root="/projects/ovcare/users/tina_zhang/data/immune_deconv/", embed_name=embed_name, augment=augment, meta_modes=meta_modes)
 
         self.classes = [
             "B_prop", "CD4_prop", "CD8_prop", "NK_prop", "neutrophil_prop",
             "monocytic_prop", "fibroblasts_prop", "endothelial_prop", "others_prop"
         ]
+        self.nb_classes = len(self.classes)
 
     def fine_to_coarse(self, insilico_fine):
         cell_type_mapping = {
@@ -164,6 +153,9 @@ class Com(Data):
         })
         self.save(data=self.catalogue, rel_path='catalogue.csv')
         return self.catalogue
+    
+    def get_nb_classes(self):
+        return self.nb_classes
     
     def get_embed_fname(self, path, fm_config_name=None):
         if self.embed_name:

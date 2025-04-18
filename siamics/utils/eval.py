@@ -232,7 +232,7 @@ class ImmuneDeconv:
         num_cell_types = self.true_prop.shape[1]
         fig, axes = plt.subplots(nrows=1, ncols=num_cell_types, figsize=(5 * num_cell_types, 5))
 
-        cell_types = ['B', 'CD4', 'CD8', 'NK', 'neutrophil', 'monocytic', 'fibroblasts', 'endothelial', 'others']
+        cell_types = ['B cell', 'CD4+ T cell', 'CD8+ T cell', 'NK cell', 'Neutrophil', 'Monocyte', 'Fibroblast', 'Endothelial cell', 'Others']
 
         if num_cell_types == 1:
             axes = [axes]
@@ -247,11 +247,10 @@ class ImmuneDeconv:
 
             slope, intercept = np.polyfit(x, y, 1)
             ax.plot(x, slope * x + intercept, color="blue")
-
             ax.set_xlabel("True Proportion")
             ax.set_ylabel("Predicted Proportion")
-            ax.set_title(f"Cell Type {cell_types[i]} (PCC: {pcc:.2f})")
-            ax.legend()
+            ax.set_title(f"{cell_types[i]} (PCC: {pcc:.2f})")
+            # ax.legend()
 
         plt.tight_layout()
         plt.savefig("cell_type_pcc.png")
@@ -301,8 +300,6 @@ class GeneEssentiality:
     def update_metrics(self):
         true_prob = jnp.array(self.true_prob)
         pred_prob = jnp.array(self.pred_prob)
-        print(true_prob.shape)
-        print(pred_prob.shape)
         squared_error = (pred_prob - true_prob) ** 2 
         self.mse = np.mean(squared_error)
         self.scc = spearmanr(self.true_prob, self.pred_prob)[0]
@@ -315,7 +312,11 @@ class GeneEssentiality:
             indices_arr = jnp.array(indices)
             true_vector = true_prob[indices_arr, :].flatten()
             pred_vector = pred_prob[indices_arr, :].flatten()
-            r, _ = spearmanr(true_vector, pred_vector)
+            if np.std(true_vector) != 0 and np.std(pred_vector) != 0:
+                r, _ = spearmanr(true_vector, pred_vector)
+            else:
+                r = np.nan
+            # r, _ = spearmanr(true_vector, pred_vector)
             gene_corrs.append(r)
 
         self.perDep_scc = np.nanmean(gene_corrs)
