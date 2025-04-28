@@ -13,9 +13,9 @@ STEP3=False
 # List all the files into another file. 
 STEP4=False
 # Generate catalogues for sub datasets 
-STEP5=False
+STEP5=True
 # generate catalgues for the pretraining big dataset. 
-STEP6=True
+STEP6=False
 
 
 def download_from_website(root, xml_fname):
@@ -119,29 +119,34 @@ geo_surv = geo.GEO_SURV()
 
 # Step 5: Generate Catalogue for the experiments that will be used in downstream tasks
 if STEP5:
-    geo_brca._gen_catalogue()
-    append_organism_to_catalogue(geo_brca)
-    geo_brca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
-    geo_brca._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_brca._gen_catalogue()
+    # append_organism_to_catalogue(geo_brca)
+    # geo_brca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    # geo_brca.catalogue = geo_brca.catalogue[geo_brca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
+    # geo_brca._split_catalogue(test_size=0.3) # TODO call grouping
 
-    geo_blca._gen_catalogue()
-    append_organism_to_catalogue(geo_blca)
-    geo_blca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
-    geo_blca._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_blca._gen_catalogue()
+    # append_organism_to_catalogue(geo_blca)
+    # geo_blca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    # geo_blca.catalogue = geo_blca.catalogue[geo_blca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
+    # geo_blca._split_catalogue(test_size=0.3) # TODO call grouping
 
-    geo_paca._gen_catalogue()
-    append_organism_to_catalogue(geo_paca)
-    geo_paca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
-    geo_paca._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_paca._gen_catalogue()
+    # append_organism_to_catalogue(geo_paca)
+    # geo_paca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    # geo_paca.catalogue = geo_paca.catalogue[geo_paca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
+    # geo_paca._split_catalogue(test_size=0.3) # TODO call grouping
 
-    geo_coad._gen_catalogue()
-    append_organism_to_catalogue(geo_coad)
-    geo_coad._apply_filter(organism=["Homo sapiens"], save_to_file=True)
-    geo_coad._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_coad._gen_catalogue()
+    # append_organism_to_catalogue(geo_coad)
+    # geo_coad._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    # geo_coad.catalogue = geo_coad.catalogue[geo_coad.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
+    # geo_coad._split_catalogue(test_size=0.3) # TODO call grouping
 
-    geo_surv._gen_catalogue()
-    append_organism_to_catalogue(geo_surv)
-    geo_surv._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    # geo_surv._gen_catalogue()
+    # append_organism_to_catalogue(geo_surv)
+    # geo_surv._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    geo_surv.catalogue = geo_surv.catalogue.reset_index(drop=True)
     geo_surv._split_catalogue(test_size=0.3) # TODO call grouping
 
 # Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks. 

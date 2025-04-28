@@ -6,6 +6,7 @@ import logging
 import pandas as pd
 import GEOparse
 import logging
+import numpy as np
 
 from . import Data
 from . import futils
@@ -13,9 +14,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class GEO(Data):
 
-    def __init__(self, catname='catalogue', catalogue=None, organism="HomoSapien", dataType='TPM', root=None, embed_name=None, augment=False, meta_modes=[]):
+    def __init__(self, catname='catalogue', catalogue=None, organism="HomoSapien", dataType='TPM', root=None, embed_name=None, augment=False):
         
         self.geneID = 'GeneID'
+        self.grouping_col = "group_id"
 
         self.organisms_dir={'HomoSapien': 'rna_seq_HomoSapien',
                             'MusMusculus': 'rna_seq_MusMusculus'}
@@ -33,7 +35,7 @@ class GEO(Data):
         else: raise ValueError
         
         relpath = self.organisms_dir[self.organism]
-        super().__init__("GEO", catalogue=catalogue, catname=catname, relpath=relpath, root=root, embed_name=embed_name, augment=augment, meta_modes=meta_modes)
+        super().__init__("GEO", catalogue=catalogue, catname=catname, relpath=relpath, root=root, embed_name=embed_name, augment=augment)
 
     def _convert_to_ensg(self, df):
         reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')
@@ -280,6 +282,13 @@ class GEO(Data):
     def uid_to_gseid(self, uid):
         return f"GSE{uid[3:]}"
     
+    def get_text_embedding(self, gsm_id, encoder): 
+        # Get the text embeddings for the given GSM IDs
+        root = os.path.join(self.root, "features/text/", encoder)
+        filename = os.path.join(root, f"{gsm_id}.npz")
+        embeds = np.load(filename)#
+        return embeds['sentence_embeddings'], embeds['hidden_states']
+
     def extract_gsms(self, xml_path, root, verbose=False):
         id_list = self.get_ids_from_xml(xml_path)
 
@@ -302,36 +311,43 @@ class GEO(Data):
                     result = future.result()  # Process completed task
                     if result is not None:
                         pbar.update(1)  # Update tqdm only if successful
-                        
+                       
 class GEO_BRCA(GEO):
-    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="BRCA"
-        self.series = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"]
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
-    
+        self.series = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"] # TODO ADD GSE181466
+        self.classes=["LuminalA", "LuminalB", "HER2", "Normal", "Basal"]
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        self._gen_class_indeces_map(self.classes)
+
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
                                                 
 class GEO_BLCA(GEO):
-    def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+    def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="BLCA"
         self.series = ["GSE244957", "GSE160693", "GSE154261"]
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+        self.classes=["Basal", "Luminal"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        self._gen_class_indeces_map(self.classes)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
     
 class GEO_PACA(GEO):
-    def __init__(self, catname="catalogue_paca", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+    def __init__(self, catname="catalogue_paca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="PACA"
         self.series = ["GSE172356", "GSE93326"]
+        self.classes=["Classical", "Basal"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        self._gen_class_indeces_map(self.classes)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
@@ -340,27 +356,47 @@ class GEO_PACA(GEO):
         return
     
 class GEO_COAD(GEO):
-    def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+    def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="COAD"
         self.series = ["GSE190609", "GSE101588", "GSE152430", "GSE132465", "GSE144735"]
+        self.classes=["CMS1","CMS2","CMS3","CMS4"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        self._gen_class_indeces_map(self.classes)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
     
 class GEO_SURV(GEO):
-    def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', root=None, augment=False):
+    def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False, mode="overall"):
         
         self.subset="SURV"
         self.series = ["GSE154261", "GSE87340", "GSE165808"]
-        
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, root=root, augment=augment)
+        self.ost_str = "os_time"
+        self.oss_str = "os_status"
+        self.pfs_str = "pfi_status"
+        self.pft_str = "pfi_time"
+        self.time_unit = "days"
+        self.mode = mode
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        if self.mode == "overall":  
+            self.catalogue = self.catalogue[self.catalogue[self.oss_str] != -1].reset_index(drop=True)
+        elif self.mode == "progression":
+            self.catalogue = self.catalogue[self.catalogue[self.pfs_str] != -1].reset_index(drop=True)
 
+        # remove the nans and reset index
+
+    def get_survival_metadata(self, metadata):
+        if self.mode == "overall":
+            event = metadata[self.oss_str].item()
+            times = metadata[self.ost_str].item()
+        elif self.mode == "progression":
+            event = metadata[self.pfs_str].item()
+            times = metadata[self.pft_str].item()
+        return event, times
+    
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
-
-        # find a way to add metadata
         return

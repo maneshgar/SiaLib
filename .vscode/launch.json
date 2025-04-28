@@ -11,6 +11,19 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "GenTextEmbeds",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/gen_text_embeddigs.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--path_to_save", 
+                "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/GEO/rna_seq_HomoSapien/features/text/",
+                "--LLM",
+                "PubMedBERT"
+            ]
         }
     ]
 }

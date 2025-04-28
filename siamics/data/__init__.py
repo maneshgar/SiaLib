@@ -43,17 +43,17 @@ def drop_sparse_data(catalogue, stats, nb_genes, threshold=0.5):
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, meta_modes=[]):
+    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False):
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
-        self.metdata=meta_modes
         self.catname = catname
 
         self.data_mode="raw"
         if embed_name: self.data_mode="features"
         self.valid_modes=['raw', 'features']
         self.remove_subids = True
+        self.indeces_map = None
 
         # Wehter to use default root or given root. 
         if root: 
@@ -108,7 +108,7 @@ class Data(Dataset):
             data = self.load_pickle(file_path)
 
         # Getting label 
-        metadata = self.catalogue.loc[idx:idx]
+        metadata = self.catalogue.loc[idx:idx] # TODO replace with this::: metadata = self.catalogue.iloc[idx:idx+1]
         
         return data, metadata, idx
     
@@ -178,10 +178,28 @@ class Data(Dataset):
         if save_to_file:
             self.save(self.catalogue, f'{self.catname}.csv')
         return self.catalogue
-    
+
+    def _gen_class_indeces_map(self, types):
+        map_dict={} 
+        for lbl in types: 
+            for idx, item in enumerate(self.classes):
+                if isinstance(item, list):  # If it's a nested list like ['BRCA', ['GBM', 'LGG'], 'LUAD', 'UCEC']
+                    if lbl in item: map_dict[lbl]=idx
+                else:
+                    if lbl == item: map_dict[lbl]=idx
+        self.indeces_map = map_dict
+
+    def get_class_index(self, str_labels, indeces_map=None):
+        if indeces_map==None:
+            indeces_map = self.indeces_map
+        return [indeces_map[label] for label in str_labels if label in indeces_map]
+
     def get_gene_id(self):
        return self.geneID
-    
+
+    def get_nb_classes(self):
+        return len(self.classes)
+        
     def get_catalogue(self, abs_path=None, types=None):
         if abs_path: 
             df = self.load(abs_path=abs_path, sep=',', index_col=0)
@@ -298,7 +316,7 @@ class Data(Dataset):
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, root=None, augment=False, embed_name=None, meta_modes=[], sub_sampled=False):
+    def __init__(self, datasets, subset, root=None, augment=False, embed_name=None, sub_sampled=False):
         """
         Initialize the DataWrapper with a list of datasets.
         
@@ -309,13 +327,13 @@ class DataWrapper(Dataset):
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
         if subset == 'full':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'validset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, root=root, embed_name=embed_name, meta_modes=meta_modes) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         else:
             raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'train', 'valid', or 'test'.")
 
@@ -338,7 +356,7 @@ class DataWrapper(Dataset):
         """
         return sum(self.lengths)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, id):
         """
         Get the sample corresponding to the given index.
         
@@ -349,16 +367,16 @@ class DataWrapper(Dataset):
             tuple: Sample from the appropriate dataset.
         """
         # Determine which dataset the index belongs to
-        dataset_idx = np.searchsorted(self.cumulative_lengths, idx, side='right')
+        dataset, dataset_id = self.get_active_dataset(id)
         
         # Calculate the sample index within the selected dataset
-        if dataset_idx == 0:
-            sample_idx = idx
+        if dataset_id == 0:
+            sample_id = id
         else:
-            sample_idx = idx - self.cumulative_lengths[dataset_idx - 1]
+            sample_id = id - self.cumulative_lengths[dataset_id - 1]
         
         # Return the sample from the appropriate dataset
-        return self.datasets[dataset_idx][sample_idx]
+        return dataset[sample_id]
 
     def collate_fn(self, batch, num_devices=None):
         data = []
@@ -382,8 +400,17 @@ class DataWrapper(Dataset):
         return data_df, meta, idx
 
     def get_active_dataset(self, idx):
-        dataset_idx = np.searchsorted(self.cumulative_lengths, idx, side='right')
-        return self.datasets[dataset_idx], dataset_idx
+        # Needs to handle idx as a list of indeces or just a single index.
+        if isinstance(idx, list):
+            dataset_idx = np.searchsorted(self.cumulative_lengths, idx, side='right')
+            datasets = [self.datasets[i] for i in dataset_idx]
+        elif isinstance(idx, (int, np.integer)):
+            dataset_idx = np.searchsorted(self.cumulative_lengths, idx, side='right')
+            datasets = self.datasets[dataset_idx]
+        else:
+            raise ValueError("Index must be a single scalar value or a list of indices.")
+        
+        return datasets, dataset_idx
     
     def get_nb_classes(self):
         count = []
@@ -396,6 +423,9 @@ class DataWrapper(Dataset):
     def get_cancer_types(self):
         return self.datasets[0].cancer_types
 
+    def get_class_names(self):
+        return self.datasets[0].classes
+
     def get_class_index(self, labels):
         return self.datasets[0].get_class_index(labels)
 
@@ -403,6 +433,16 @@ class DataWrapper(Dataset):
         for dataset in self.datasets:
             dataset.set_data_mode(mode)
 
+    def get_text_embeddings(self, gsm_ids, idx, encoder="PubMedBERT"):
+        # Get the text embeddings for the given GSM IDs
+        text_embeddings = []
+        for (gsm, id) in zip(gsm_ids, idx):
+            dset, _ = self.get_active_dataset(id)
+            embeds, _ = dset.get_text_embedding(gsm, encoder=encoder)
+            text_embeddings.append(embeds)
+        text_embeddings = np.vstack(text_embeddings)
+        return text_embeddings
+        
     def gen_common_genes_sample_file(self, out_path=None):
         samples = []
         for dataset in self.dataset_objs:
@@ -420,9 +460,23 @@ class DataWrapper(Dataset):
         print(f"Common genes: {len(common_genes)}")
         return common_genes, sample_file
     
+    def get_grouping_str(self, id):
+        dset, dset_id = self.get_active_dataset(id)
+        return dset.grouping_col
+
     def get_all_sample_ids(self):
         sample_ids = []
         for dataset in self.datasets:
             if 'sample_id' in dataset.catalogue.columns:
                 sample_ids.extend(dataset.catalogue['sample_id'].tolist())
         return sample_ids
+
+    def get_survival_metadata(self, metadata, idx):
+        times = []
+        events = []
+        datasets, dataset_idx = self.get_active_dataset(idx)
+        for d, id in zip(datasets, idx):
+            e, t = d.get_survival_metadata(metadata.loc[id:id])
+            events.append(e)
+            times.append(t) 
+        return events, times

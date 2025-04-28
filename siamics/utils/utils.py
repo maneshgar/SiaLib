@@ -4,9 +4,17 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 from siamics.utils.futils import create_directories
 
+def get_label_index(labels_list):
+    map_dict={}
+    types_unique = list(set(labels_list)) 
+    map_dict = {lbl: idx for idx, lbl in enumerate(types_unique)}
+    label_index = [map_dict[lbl] for lbl in labels_list]
+    return label_index, types_unique
+
 def plot_umap(
-    data, 
+    data=None, 
     labels=None, 
+    umap_embedding=None,
     n_neighbors=15, 
     n_components=2, 
     metric='euclidean', 
@@ -34,9 +42,10 @@ def plot_umap(
     Returns:
         BytesIO or None: Returns BytesIO object if `return_image` is True, else None.
     """
-    # Step 1: Create and fit the UMAP model
-    umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components, metric=metric, **kwargs)
-    umap_embedding = umap_model.fit_transform(data)
+    if umap_embedding is None:
+        # Step 1: Create and fit the UMAP model
+        umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components, metric=metric, **kwargs)
+        umap_embedding = umap_model.fit_transform(data)
 
     # Step 2: Create the plot
     plt.figure(figsize=(8, 6))
@@ -82,7 +91,7 @@ def plot_umap(
     plt.show()
 
     # Return the in-memory image if requested
-    return image_buffer
+    return image_buffer, umap_embedding
 
 def plot_hist(data):
     # Plot histogram

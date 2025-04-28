@@ -8,20 +8,22 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, catname="catalogue", cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
+    def __init__(self, catalogue=None, catname="catalogue", classes=None, root=None, embed_name=None, augment=False):
         self.geneID = "gene_id"
-        
-        if cancer_types:
+        self.grouping_col = "patient_id"
+
+        if classes:
             # To handle nested classes
-            self.classes = cancer_types
-            self.cancer_types = [item for sublist in cancer_types for item in (sublist if isinstance(sublist, list) else [sublist])]
+            self.classes = classes
+            self.cancer_types = [item for sublist in classes for item in (sublist if isinstance(sublist, list) else [sublist])]
         else: 
-            self.cancer_types= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
+            self.classes= ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
           'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM']
-            self.classes = self.cancer_types
+            self.cancer_types = self.classes
 
         self.nb_classes = len(self.classes)
-        super().__init__("TCGA", catalogue=catalogue, catname=catname, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment)
+        super().__init__("TCGA", catalogue=catalogue, catname=catname, cancer_types=self.cancer_types, root=root, embed_name=embed_name, augment=augment)
+        self._gen_class_indeces_map(self.classes)
 
     def _gen_catalogue(self, dirname, ext='.csv'):
         sub_list = [] 
@@ -71,17 +73,6 @@ class TCGA(Data):
     def save(self, data, rel_path, sep=","):
         return super().save(data, rel_path, sep)
 
-    def get_class_index(self, str_labels):
-        labels = []
-        for lbl in str_labels: 
-            for idx, item in enumerate(self.classes):
-                if isinstance(item, list):  # If it's a nested list like ['BRCA', ['GBM', 'LGG'], 'LUAD', 'UCEC']
-                    if lbl in item: labels.append(idx)
-                else:
-                    if lbl == item: labels.append(idx)
-
-        return labels
-
     def get_nb_classes(self):
         return self.nb_classes
     
@@ -119,23 +110,29 @@ class TCGA(Data):
             futils.create_directories(out_path)
             self.save(df, out_path)
         return 
-    
 
 class TCGA5(TCGA):
-    def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
-        cancer_types = ['BRCA', 'BLCA', ['GBM','LGG'], 'LUAD', 'UCEC'] # BRCA, BLCA, GBMLGG, LUAD, and UCEC
-        super().__init__(catalogue=catalogue, cancer_types=cancer_types, root=root, meta_modes=meta_modes, embed_name=embed_name, augment=augment)
+    def __init__(self, catalogue=None, classes=None, root=None, embed_name=None, augment=False):
+        classes = ['BRCA', 'BLCA', ['GBM','LGG'], 'LUAD', 'UCEC'] # BRCA, BLCA, GBMLGG, LUAD, and UCEC
+        super().__init__(catalogue=catalogue, classes=classes, root=root, embed_name=embed_name, augment=augment)
+        self._gen_class_indeces_map(self.cancer_types)
 
 class TCGA6(TCGA):
-    def __init__(self, catalogue=None, cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
-        cancer_types = ['BRCA', 'THCA', 'GBM', 'LGG', 'LUAD', 'UCEC']
-        super().__init__(catalogue=catalogue, cancer_types=cancer_types, root=root, meta_modes=meta_modes, embed_name=embed_name, augment=augment)
+    def __init__(self, catalogue=None, classes=None, root=None, embed_name=None, augment=False):
+        classes = ['BRCA', 'THCA', 'GBM', 'LGG', 'LUAD', 'UCEC']
+        super().__init__(catalogue=catalogue, classes=classes, root=root, embed_name=embed_name, augment=augment)
+        self._gen_class_indeces_map(self.cancer_types)
 
 class TCGA_SURV(TCGA):
 
-    def __init__(self, catalogue=None, catname="catalogue_surv", cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
+    def __init__(self, catalogue=None, catname="catalogue_surv", classes=None, root=None, embed_name=None, augment=False):
         self.subset="SURV"
-        super().__init__(catalogue=catalogue, catname=catname, cancer_types=cancer_types, root=root, meta_modes=meta_modes, embed_name=embed_name, augment=augment)
+        self.oss_str = "Overall Survival Status"
+        self.ost_str = "Overall Survival (Months)"
+        self.pfs_str = "Progression Free Status"
+        self.pft_str = "Progress Free Survival (Months)"
+        self.time_unit = "months"
+        super().__init__(catalogue=catalogue, catname=catname, classes=classes, root=root, embed_name=embed_name, augment=augment)
 
     def _read_survival_metadata(self, catalogue, dir="clinical_data", dropnan=True):
         survival_files = glob(os.path.join(self.root, dir, "*.tsv"))
@@ -157,9 +154,20 @@ class TCGA_SURV(TCGA):
         self.save(self.catalogue, f'{self.catname}.csv')
         self._split_catalogue()
 
+    def get_survival_metadata(self, metadata, type="overall"):
+        if type == "overall":
+            event = np.array(metadata[self.oss_str])
+            event = np.array([int(x.split(':')[0]) for x in event])
+            times = np.array(metadata[self.ost_str])
+        elif type == "progression":
+            event = np.array(metadata[self.pfs_str])
+            event = np.array([int(x.split(':')[0]) for x in event])
+            times = np.array(metadata[self.pft_str])
+        return event, times
+    
 class TCGA_SURV5(TCGA_SURV):
-    def __init__(self, catalogue=None, catname="catalogue_surv", cancer_types=None, root=None, meta_modes=[], embed_name=None, augment=False):
-        cancer_types = ['BLCA', 'LUAD', 'OV', 'COAD', 'UCEC']
-        super().__init__(catalogue, catname, cancer_types, root, meta_modes, embed_name, augment)
+    def __init__(self, catalogue=None, catname="catalogue_surv", classes=None, root=None, embed_name=None, augment=False):
+        classes = ['BLCA', 'LUAD', 'OV', 'COAD', 'UCEC']
+        super().__init__(catalogue, catname, classes, root, embed_name, augment)
 
 
