@@ -1,6 +1,7 @@
 import umap
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from io import BytesIO
 from siamics.utils.futils import create_directories
 
@@ -14,6 +15,9 @@ def get_label_index(labels_list):
 def plot_umap(
     data=None, 
     labels=None, 
+    label_name_mapping=None, 
+    application=None,
+    n_classes=None,
     umap_embedding=None,
     n_neighbors=15, 
     n_components=2, 
@@ -56,23 +60,59 @@ def plot_umap(
     plt.grid(True)
 
     if labels:
-        # Define a mapping from labels to colors
-        unique_labels = list(set(labels))
-        label_to_color = {label: color for label, color in zip(unique_labels, plt.cm.tab20.colors)}
+        # Map labels to class names if mapping is provided
+        # unique_labels = sorted(set(labels))  # integers like 0, 1, 2, ..., 49
 
-        # Map the labels to colors
-        colors = [label_to_color[label] for label in labels]
+        if application == "source":
+            # Hardcoded mapping
+            label_name_mapping = {
+                0: "GEO",
+                1: "TCGA"
+            }
+            # 'GEO' -> 0
+            name_to_index_mapping = {v: k for k, v in label_name_mapping.items()}
+            try:
+                labels = [name_to_index_mapping[label] for label in labels]
+            except KeyError as e:
+                raise ValueError(f"Unknown label {e} in source labels!")
 
-        scatter = plt.scatter(
+        # Step 2: Prepare colors
+        unique_labels = sorted(set(labels))
+
+        # Generate color map for integer indices
+        cmap = plt.cm.get_cmap('nipy_spectral', n_classes)
+        index_to_color = {i: cmap(i) for i in range(n_classes)}
+        colors = [index_to_color[label] for label in labels]
+
+        if label_name_mapping is not None:
+            try:
+                display_names = {i: label_name_mapping[i] for i in unique_labels}
+            except Exception as e:
+                raise ValueError(f"Error mapping labels with `label_name_mapping`: {e}")
+        else:
+            display_names = {i: str(i) for i in unique_labels}
+
+
+        plt.scatter(
             umap_embedding[:, 0], 
             umap_embedding[:, 1], 
             c=colors, 
             **scatter_args
         )
-        plt.colorbar(scatter, label='Labels')
+        
+        handles = [Patch(color=index_to_color[label], label=display_names[label]) for label in unique_labels]
+        if(application == "type"):
+            plt.legend(handles=handles, title="Cancer Type", bbox_to_anchor=(1.05, 1), loc='upper left')
+        elif(application == "subtype"):
+            plt.legend(handles=handles, title="Subtype", bbox_to_anchor=(1.05, 1), loc='upper left')
+        elif(application == "source"):
+            plt.legend(handles=handles, title="Dataset", bbox_to_anchor=(1.05, 1), loc='upper left')
 
     else:
         plt.scatter(umap_embedding[:, 0], umap_embedding[:, 1], **scatter_args)
+
+    plt.xlabel("UMAP 1")
+    plt.ylabel("UMAP 2")
         
     # Step 3: Save the plot to disk if save_path is specified
     if save_path:

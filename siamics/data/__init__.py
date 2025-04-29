@@ -43,7 +43,7 @@ def drop_sparse_data(catalogue, stats, nb_genes, threshold=0.5):
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False):
+    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
@@ -66,8 +66,8 @@ class Data(Dataset):
         if catalogue is None:
             # Default catalogue
             try:
-                self.get_catalogue(types=cancer_types)
-                self.get_subsets(types=cancer_types)
+                self.get_catalogue(types=cancer_types, subtype=subtype)
+                self.get_subsets(types=cancer_types, subtype=subtype)
                 self.catalogue = self.catalogue.reset_index(drop=True)
             except:
                 print(f"Warning: {self.name} catalogue has not been generated yet!")
@@ -79,7 +79,10 @@ class Data(Dataset):
 
         # If the catalogue itself is provided. 
         else:
-            if cancer_types:
+            if subtype:
+                if cancer_types:
+                    self.catalogue = catalogue[catalogue['subtype'].isin(self.cancer_types)]
+            elif cancer_types:
                 self.catalogue = catalogue[catalogue['cancer_type'].isin(self.cancer_types)]
             else: 
                 self.catalogue = catalogue
@@ -199,29 +202,40 @@ class Data(Dataset):
 
     def get_nb_classes(self):
         return len(self.classes)
-        
-    def get_catalogue(self, abs_path=None, types=None):
+
+    def get_catalogue(self, abs_path=None, types=None, subtype=False):
         if abs_path: 
             df = self.load(abs_path=abs_path, sep=',', index_col=0)
         else: 
             df = self.load(rel_path=f'{self.catname}.csv', sep=',', index_col=0)
         
-        if types:
-            df = df[df['cancer_type'].isin(types)]
-            df = df.reset_index(drop=True)
+        if subtype:
+            if types:
+                df = df[df['subtype'].isin(types)]
+                df = df.reset_index(drop=True)
+        else:
+            if types:
+                df = df[df['cancer_type'].isin(types)]
+                df = df.reset_index(drop=True)
         
         self.catalogue = df
         return self.catalogue
 
-    def get_subsets(self, types=None, ):
+    def get_subsets(self, types=None, subtype=False):
         df_train = self.load(rel_path=f'{self.catname}_train.csv', sep=',', index_col=0)
         df_valid = self.load(rel_path=f'{self.catname}_valid.csv', sep=',', index_col=0)
         df_test  = self.load(rel_path=f'{self.catname}_test.csv' , sep=',', index_col=0)
 
-        if types:
-            df_train = df_train[df_train['cancer_type'].isin(types)].reset_index(drop=True)
-            df_valid = df_valid[df_valid['cancer_type'].isin(types)].reset_index(drop=True)
-            df_test  = df_test[df_test['cancer_type'].isin(types)].reset_index(drop=True)
+        if subtype:
+            if types:
+                df_train = df_train[df_train['subtype'].isin(types)].reset_index(drop=True)
+                df_valid = df_valid[df_valid['subtype'].isin(types)].reset_index(drop=True)
+                df_test  = df_test[df_test['subtype'].isin(types)].reset_index(drop=True)
+        else:
+            if types:
+                df_train = df_train[df_train['cancer_type'].isin(types)].reset_index(drop=True)
+                df_valid = df_valid[df_valid['cancer_type'].isin(types)].reset_index(drop=True)
+                df_test  = df_test[df_test['cancer_type'].isin(types)].reset_index(drop=True)
         
         self.trainset = df_train
         self.validset = df_valid

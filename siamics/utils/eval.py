@@ -201,7 +201,7 @@ class Survival:
         print(f"C-index: {self.c_index:.4f}")
         return self.c_index
     
-class ImmuneDeconv:
+class TMEDeconv:
     def __init__(self):
         self.true_prop = [[]]
         self.pred_prop = [[]]

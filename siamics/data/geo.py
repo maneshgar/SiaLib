@@ -339,10 +339,10 @@ class GEO_BLCA(GEO):
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
     
-class GEO_PACA(GEO):
-    def __init__(self, catname="catalogue_paca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+class GEO_PAAD(GEO): #TODO: change data-related naming to PAAD
+    def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
-        self.subset="PACA"
+        self.subset="PAAD"
         self.series = ["GSE172356", "GSE93326"]
         self.classes=["Classical", "Basal"]
         
