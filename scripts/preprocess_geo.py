@@ -113,7 +113,7 @@ if STEP4:
 
 geo_brca = geo.GEO_BRCA()
 geo_blca = geo.GEO_BLCA()
-geo_paca = geo.GEO_PACA()
+geo_paad = geo.GEO_PAAD()
 geo_coad = geo.GEO_COAD()
 geo_surv = geo.GEO_SURV()
 
@@ -131,11 +131,11 @@ if STEP5:
     # geo_blca.catalogue = geo_blca.catalogue[geo_blca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
     # geo_blca._split_catalogue(test_size=0.3) # TODO call grouping
 
-    # geo_paca._gen_catalogue()
-    # append_organism_to_catalogue(geo_paca)
-    # geo_paca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
-    # geo_paca.catalogue = geo_paca.catalogue[geo_paca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_paca._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_paad._gen_catalogue()
+    # append_organism_to_catalogue(geo_paad)
+    # geo_paad._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    # geo_paad.catalogue = geo_paad.catalogue[geo_paad.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
+    # geo_paad._split_catalogue(test_size=0.3) # TODO call grouping
 
     # geo_coad._gen_catalogue()
     # append_organism_to_catalogue(geo_coad)
@@ -151,6 +151,6 @@ if STEP5:
 
 # Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks. 
 if STEP6:
-    exp_lists = [geo_brca.series, geo_blca.series, geo_paca.series, geo_coad.series, geo_surv.series]
+    exp_lists = [geo_brca.series, geo_blca.series, geo_paad.series, geo_coad.series, geo_surv.series]
     exp_gses = [item for sublist in exp_lists for item in sublist]
     generate_catalogue(dataset=geo.GEO(), type='exc', experiments=exp_gses)

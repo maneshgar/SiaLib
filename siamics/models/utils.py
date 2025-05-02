@@ -131,6 +131,22 @@ def avg_grads(grads_list):
 def count_jax_parameters(params):
     return sum(jnp.size(p) for p in jax.tree_util.tree_leaves(params))
 
+def check_params_for_nan_or_inf(params):
+    """Check if the parameters contain NaN or Inf values."""
+    for p in jax.tree_util.tree_leaves(params):
+        if jnp.isnan(p).any() or jnp.isinf(p).any():
+            return True
+    return False
+
+def count_nans_and_infs(params):
+    """Count the number of NaN and Inf values in the parameters."""
+    nan_count = 0
+    inf_count = 0
+    for p in jax.tree_util.tree_leaves(params):
+        nan_count += jnp.isnan(p).sum()
+        inf_count += jnp.isinf(p).sum()
+    return int(nan_count), int(inf_count)
+
 def compute_grad_norm(grads):
     """Compute the global norm of gradients."""
     norm = jnp.sqrt(sum(jnp.sum(jnp.square(p)) for p in jax.tree_util.tree_leaves(grads)))

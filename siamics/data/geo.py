@@ -312,7 +312,7 @@ class GEO(Data):
                     if result is not None:
                         pbar.update(1)  # Update tqdm only if successful
                        
-class GEO_BRCA(GEO):
+class GEO_SUBTYPE_BRCA(GEO):
     def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="BRCA"
@@ -325,7 +325,7 @@ class GEO_BRCA(GEO):
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
                                                 
-class GEO_BLCA(GEO):
+class GEO_SUBTYPE_BLCA(GEO):
     def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="BLCA"
@@ -339,7 +339,7 @@ class GEO_BLCA(GEO):
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
     
-class GEO_PAAD(GEO): #TODO: change data-related naming to PAAD
+class GEO_SUBTYPE_PAAD(GEO):
     def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="PAAD"
@@ -355,7 +355,7 @@ class GEO_PAAD(GEO): #TODO: change data-related naming to PAAD
         # find a way to add metadata
         return
     
-class GEO_COAD(GEO):
+class GEO_SUBTYPE_COAD(GEO):
     def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
         
         self.subset="COAD"

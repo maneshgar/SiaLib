@@ -41,6 +41,23 @@ def drop_sparse_data(catalogue, stats, nb_genes, threshold=0.5):
     filter = cat['zeros_count'] < zeros_thresh 
     return cat[filter].drop('zeros_count', axis=1).reset_index()
 
+class Caching:
+    def __init__(self, size=25000):
+        self.items = {}
+        self.max_size = size
+
+    def get_item(self, id):
+        return self.items[id]
+
+    def cache_item(self, id, item):
+        if len(self.items) <= self.max_size:
+            self.items[id] = item
+            return True
+        return False
+
+    def is_cached(self, id):
+        return id in self.items
+
 class Data(Dataset):
 
     def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
@@ -337,6 +354,8 @@ class DataWrapper(Dataset):
         Args:
             datasets (list): List of datasets to be wrapped.
         """
+        self.caching = Caching()
+
         self.datasets_cls = datasets # GTEX, TCGA, etc.
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
@@ -380,6 +399,11 @@ class DataWrapper(Dataset):
         Returns:
             tuple: Sample from the appropriate dataset.
         """
+
+        # check if the data is cached
+        if self.caching.is_cached(id):
+            return self.caching.get_item(id)
+        
         # Determine which dataset the index belongs to
         dataset, dataset_id = self.get_active_dataset(id)
         
@@ -390,7 +414,11 @@ class DataWrapper(Dataset):
             sample_id = id - self.cumulative_lengths[dataset_id - 1]
         
         # Return the sample from the appropriate dataset
-        return dataset[sample_id]
+        item = dataset[sample_id]
+
+        # Cache the sample
+        self.caching.cache_item(id, item)
+        return item
 
     def collate_fn(self, batch, num_devices=None):
         data = []
