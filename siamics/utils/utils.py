@@ -53,7 +53,7 @@ def plot_umap(
 
     # Step 2: Create the plot
     plt.figure(figsize=(8, 6))
-    scatter_args = {'s': 10, 'alpha': 0.7}  # Default scatter plot settings
+    scatter_args = {'s': 10, 'alpha': 0.3}  #increased transparency of dots
     plt.title('UMAP Projection')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -101,19 +101,66 @@ def plot_umap(
         )
         
         handles = [Patch(color=index_to_color[label], label=display_names[label]) for label in unique_labels]
-        if(application == "type"):
-            plt.legend(handles=handles, title="Cancer Type", bbox_to_anchor=(1.05, 1), loc='upper left')
-        elif(application == "subtype"):
-            plt.legend(handles=handles, title="Subtype", bbox_to_anchor=(1.05, 1), loc='upper left')
-        elif(application == "source"):
-            plt.legend(handles=handles, title="Dataset", bbox_to_anchor=(1.05, 1), loc='upper left')
+        if application:
+            legend_title = "Centre" if application == "group_id" else application.replace("_", " ").title()
+
+            plt.legend(
+                handles=handles,
+                title=legend_title,
+                bbox_to_anchor=(1.05, 1),
+                loc='upper left',
+                fontsize=8,           # smaller text
+                title_fontsize=9,     # smaller title
+                markerscale=2.5,      # increase marker size relative to small dots
+                handlelength=1.2,     # shorten line length
+                handletextpad=0.4,    # space between marker and text
+                borderpad=0.3,        # space inside legend box
+                labelspacing=0.3,     # space between entries
+                frameon=False         # remove box
+            )
 
     else:
         plt.scatter(umap_embedding[:, 0], umap_embedding[:, 1], **scatter_args)
+    
+    # remove box, ticks, axes, axes labels
+    ax = plt.gca()
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_xlabel("")  
+    ax.set_ylabel("")  
+    for spine in ax.spines.values():
+        spine.set_visible(False)
 
-    plt.xlabel("UMAP 1")
-    plt.ylabel("UMAP 2")
-        
+    # custom axes labels with arrows:
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    arrowprops = dict(facecolor='black', arrowstyle='->', lw=0.8, shrinkA=0, shrinkB=0)
+
+    # shorten arrows
+    x_arrow_len = (xmax - xmin) * 0.05
+    y_arrow_len = (ymax - ymin) * 0.05 
+    arrowprops = dict(
+        facecolor='black',
+        arrowstyle='->',
+        lw=0.8,
+        shrinkA=0,
+        shrinkB=0,
+        mutation_scale=5  # smaller arrowhead
+    )
+
+    # Arrows 
+    ax.annotate('', xy=(xmin + x_arrow_len, ymin), xytext=(xmin, ymin), arrowprops=arrowprops)  
+    ax.annotate('', xy=(xmin, ymin + y_arrow_len), xytext=(xmin, ymin), arrowprops=arrowprops)  
+
+    ax.text(xmin + x_arrow_len / 2, ymin - (ymax - ymin) * 0.02, "UMAP 1",
+            va='top', ha='center', fontsize=10)
+
+    ax.text(xmin - (xmax - xmin) * 0.03, ymin + y_arrow_len / 2, "UMAP 2",
+            va='center', ha='right', fontsize=10, rotation=90)
+
+            
     # Step 3: Save the plot to disk if save_path is specified
     if save_path:
         create_directories(save_path)

@@ -203,7 +203,7 @@ class GEO(Data):
 
         def process_file(filename, check_metadata=False):
             try: 
-                match = re.search(r"GSE\d+", filename)
+                match = re.search(r"GSE\d+", filename)              
                 if match:
                     gse_id = match.group()
                     # Check if the experiment is not excluded. 
@@ -399,4 +399,133 @@ class GEO_SURV(GEO):
     
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
+        return
+    
+class GEO_BATCH(GEO):
+    def __init__(self, catname=None, catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _read_batch_metadata(self, catalogue):
+        batch_file = "batch_meta.csv"
+        batch_df = self.load(rel_path=batch_file, sep=",", index_col=None)
+
+        for col in ['cancer_type', 'platform', 'cell_lines', 'organism', 'subtype_status']:
+            mapping = batch_df.set_index('group_id')[col]
+            catalogue[col] = catalogue['group_id'].map(mapping)
+
+        catalogue["subtype"] = pd.NA
+
+        # Loop through each cancer_type that requires subtype annotation
+        for cancer_type in catalogue.loc[catalogue["subtype_status"] == 1, "cancer_type"].dropna().unique():
+            subtype_file = f"catalogue_{cancer_type.lower()}.csv"  
+            try:
+                subtype_df = self.load(rel_path=subtype_file, sep=",", index_col=None)
+            except FileNotFoundError:
+                print(f" Warning: {subtype_file} not found.")
+                continue
+
+            mask = (catalogue["cancer_type"] == cancer_type) & (catalogue["subtype_status"] == 1)
+
+            merged = catalogue[mask].drop(columns=["subtype"]).merge(
+                subtype_df[["group_id", "sample_id", "subtype"]],
+                on=["group_id", "sample_id"],
+                how="left"
+            )
+
+            if "subtype" in merged.columns:
+                updated_subtypes = merged["subtype"].replace("Unknown", pd.NA)
+                catalogue.loc[mask, "subtype"] = updated_subtypes.values
+                print(f"Updated {updated_subtypes.notna().sum()} subtype values for cancer type {cancer_type}")
+            else:
+                print(f"Merge succeeded but 'subtype' column missing in result for {cancer_type}")
+
+        catalogue[["centre"]] = catalogue[["group_id"]]
+        return catalogue.reset_index(drop=True)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue(experiments=self.series, type="inc")
+        # filter out samples
+        filter_file = self.load(rel_path="filter_meta.csv", sep=",", index_col=None)
+        filter_pairs = filter_file[["group_id", "sample_id"]]
+        merged = self.catalogue.merge(filter_pairs, on=["group_id", "sample_id"], how="left", indicator=True)
+        self.catalogue = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
+
+        self.catalogue = self._read_batch_metadata(self.catalogue)
+        self.save(self.catalogue, f'{self.catname}.csv')
+        return
+
+class GEO_BATCH_BRCA(GEO_BATCH):
+    def __init__(self, catname="catalogue_batch_brca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        self.series = ["GSE243375", "GSE235052", "GSE271080", "GSE202922", "GSE260693", "GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854",  "GSE159448", "GSE139274",  "GSE270967", "GSE110114"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue()
+        return
+
+class GEO_BATCH_PAAD(GEO_BATCH):
+    def __init__(self, catname="catalogue_batch_paad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        self.series = ["GSE242516", "GSE224564", "GSE242915", "GSE172356", "GSE93326"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue()
+        return
+
+class GEO_BATCH_COAD(GEO_BATCH):
+    def __init__(self, catname="catalogue_batch_coad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        self.series = ["GSE190609", "GSE101588", "GSE152430", "GSE241699"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue()
+        return
+
+class GEO_BATCH_BLCA(GEO_BATCH):
+    def __init__(self, catname="catalogue_batch_blca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        self.series = ["GSE245748", "GSE236932", "GSE160693", "GSE154261"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue()
+        return
+
+class GEO_BATCH_OVARIAN(GEO_BATCH):
+    def __init__(self, catname="catalogue_batch_ovarian", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        self.series = ["GSE165808"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue()
+        return
+
+class GEO_BATCH_LUAD(GEO_BATCH):
+    def __init__(self, catname="catalogue_batch_luad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        self.series = ["GSE87340"]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue()
+        return
+
+class GEO_BATCH_6(GEO_BATCH):
+    def __init__(self, catname="catalogue_batch_6", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+        self.series = ["GSE243375", "GSE235052", "GSE271080", "GSE202922", "GSE260693", "GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854",  "GSE159448", "GSE139274",  "GSE270967", "GSE110114", #BRCA
+                "GSE242516", "GSE224564", "GSE242915", "GSE172356", "GSE93326",  #PAAD
+                "GSE190609", "GSE101588", "GSE152430", "GSE241699", #COAD
+                "GSE245748", "GSE236932", "GSE160693", "GSE154261", #BLCA
+                "GSE165808", #OVARIAN
+                "GSE87340" #LUAD
+                ]
+        
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue()
         return
