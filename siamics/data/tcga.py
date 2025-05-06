@@ -319,9 +319,9 @@ class TCGA_SUBTYPE_BLCA(TCGA_SUBTYPE):
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
+
 class TCGA_SUBTYPE_COAD(TCGA_SUBTYPE):
     def __init__(self, catalogue=None, catname="catalogue_subtype_coad", cancer=['COAD'], classes=None, root=None, embed_name=None, augment=False, subtype=True):
-    def __init__(self, catalogue=None, catname="catalogue_coad", cancer="coad", classes=None, root=None, embed_name=None, augment=False, subtype=True):
         classes=["CMS1","CMS2","CMS3","CMS4"]
         super().__init__(catalogue, catname, cancer=cancer, classes=classes, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
         self.cancer = cancer

@@ -26,6 +26,7 @@ def plot_umap(
     ylabel="Y Label", 
     save_path=None, 
     return_image=False, 
+    transparency=0.2,
     **kwargs
 ):
     """
@@ -53,7 +54,7 @@ def plot_umap(
 
     # Step 2: Create the plot
     plt.figure(figsize=(8, 6))
-    scatter_args = {'s': 10, 'alpha': 0.3}  #increased transparency of dots
+    scatter_args = {'s': 8, 'alpha': transparency}  #increased transparency of dots
     plt.title('UMAP Projection')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -160,7 +161,6 @@ def plot_umap(
     ax.text(xmin - (xmax - xmin) * 0.03, ymin + y_arrow_len / 2, "UMAP 2",
             va='center', ha='right', fontsize=10, rotation=90)
 
-            
     # Step 3: Save the plot to disk if save_path is specified
     if save_path:
         create_directories(save_path)
