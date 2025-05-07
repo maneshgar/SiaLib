@@ -351,12 +351,12 @@ class GEO_SUBTYPE_PAAD(GEO):
         self.subset="PAAD"
         self.series = ["GSE172356", "GSE93326"]
         self.classes=["Classical", "Basal"]
-        # drop if catalogue has unknown classes
-        if only_labeled_data:
-            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
 
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
         self._gen_class_indeces_map(self.classes)
+        # drop if catalogue has unknown classes
+        if only_labeled_data:
+            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
