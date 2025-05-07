@@ -26,7 +26,7 @@ def plot_umap(
     ylabel="Y Label", 
     save_path=None, 
     return_image=False, 
-    transparency=0.2,
+    transparency=0.4,
     **kwargs
 ):
     """

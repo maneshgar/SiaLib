@@ -13,7 +13,7 @@ class TCGA(Data):
 
     def __init__(self, catalogue=None, catname="catalogue", classes=None, root=None, embed_name=None, augment=False, subtype=False):
         self.geneID = "gene_id"
-        self.grouping_col = "group_id" # was patient_id
+        self.grouping_col = "patient_id" # was patient_id
 
         if classes:
             # To handle nested classes
