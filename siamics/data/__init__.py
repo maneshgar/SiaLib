@@ -64,7 +64,7 @@ class Caching:
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, subtype=False, label_col_str):
+    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
