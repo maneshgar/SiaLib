@@ -313,20 +313,23 @@ class GEO(Data):
                         pbar.update(1)  # Update tqdm only if successful
                        
 class GEO_SUBTYPE_BRCA(GEO):
-    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False, only_labeled_data=True):
         
         self.subset="BRCA"
         self.series = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"] # TODO ADD GSE181466
         self.classes=["LuminalA", "LuminalB", "HER2", "Normal", "Basal"]
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
         self._gen_class_indeces_map(self.classes)
+        # drop if catalogue has unknown classes
+        if only_labeled_data:
+            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
                                                 
 class GEO_SUBTYPE_BLCA(GEO):
-    def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False, only_labeled_data=True):
         
         self.subset="BLCA"
         self.series = ["GSE244957", "GSE160693", "GSE154261"]
@@ -334,18 +337,24 @@ class GEO_SUBTYPE_BLCA(GEO):
         
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
         self._gen_class_indeces_map(self.classes)
+        # drop if catalogue has unknown classes
+        if only_labeled_data:
+            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
         return
     
 class GEO_SUBTYPE_PAAD(GEO):
-    def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False, only_labeled_data=True):
         
         self.subset="PAAD"
         self.series = ["GSE172356", "GSE93326"]
         self.classes=["Classical", "Basal"]
-        
+        # drop if catalogue has unknown classes
+        if only_labeled_data:
+            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
+
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
         self._gen_class_indeces_map(self.classes)
 
@@ -356,7 +365,7 @@ class GEO_SUBTYPE_PAAD(GEO):
         return
     
 class GEO_SUBTYPE_COAD(GEO):
-    def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False, only_labeled_data=True):
         
         self.subset="COAD"
         self.series = ["GSE190609", "GSE101588", "GSE152430", "GSE132465", "GSE144735"]
@@ -364,6 +373,9 @@ class GEO_SUBTYPE_COAD(GEO):
         
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
         self._gen_class_indeces_map(self.classes)
+        # drop if catalogue has unknown classes
+        if only_labeled_data:
+            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue(experiments=self.series, type="inc")
