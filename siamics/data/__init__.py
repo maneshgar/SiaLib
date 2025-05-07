@@ -476,8 +476,17 @@ class DataWrapper(Dataset):
     def get_cancer_types(self):
         return self.datasets[0].cancer_types
 
-    def get_class_names(self):
-        return self.datasets[0].classes
+    def get_class_names(self, merge_to_string=True):
+        if merge_to_string:
+            class_names = []
+            for class_item in self.datasets[0].classes:
+                if isinstance(class_item, list):
+                    class_names.append("&".join(class_item))
+                else:
+                    class_names.append(class_item)
+            return class_names
+        else:
+            return self.datasets[0].classes
 
     def get_class_index(self, labels):
         return self.datasets[0].get_class_index(labels)

@@ -230,7 +230,6 @@ class TCGA(Data):
 
             print(f"Saved metadata to: {json_path}")
 
-
 class TCGA5(TCGA):
     def __init__(self, catalogue=None, classes=None, root=None, embed_name=None, augment=False, subtype=False):
         classes = ['BRCA', 'BLCA', ['GBM','LGG'], 'LUAD', 'UCEC'] # BRCA, BLCA, GBMLGG, LUAD, and UCEC
