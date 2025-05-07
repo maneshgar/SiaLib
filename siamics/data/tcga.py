@@ -113,6 +113,38 @@ class TCGA(Data):
             futils.create_directories(out_path)
             self.save(df, out_path)
         return 
+
+    def _read_subtype_metadata(self, catalogue, cancers, dropnan=False): 
+        catalogue = catalogue[catalogue["cancer_type"].isin(cancers)].copy()
+        catalogue = catalogue.drop_duplicates(subset="group_id")
+        catalogue = catalogue.set_index("group_id")
+
+        # Initialize subtype for multi-cancer merging (for batch effect)
+        if 'subtype' not in catalogue.columns:
+            catalogue['subtype'] = pd.NA
+
+        for cancer in cancers:
+            subtype_file = os.path.join(self.root, f"{cancer.lower()}_subtype.csv")
+            print(f"Checking subtype file: {subtype_file}")
+
+            if not os.path.isfile(subtype_file):
+                print(f"Warning: Subtype file not found for {cancer}")
+                continue
+
+            df = self.load(abs_path=subtype_file, sep=",", index_col=None)
+            df = df[['group_id', 'subtype']].dropna()
+            df = df.drop_duplicates(subset="group_id")
+            df = df.set_index("group_id")
+
+            # Align subtype info 
+            catalogue['subtype'] = catalogue['subtype'].combine_first(df['subtype'])
+
+        catalogue = catalogue.reset_index()
+
+        if dropnan:
+            catalogue = catalogue.dropna(subset=["subtype"])
+
+        return catalogue.reset_index(drop=True)
     
     # get centre info
     def extract_centre(self, save_dir, project_ids=None):
@@ -261,38 +293,6 @@ class TCGA_SURV5(TCGA_SURV):
 class TCGA_SUBTYPE(TCGA):
     def __init__(self, catalogue=None, catname=None, cancer=None, classes=None, root=None, embed_name=None, augment=False, subtype=True):
         super().__init__(catalogue=catalogue, catname=catname, classes=classes, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
-
-    def _read_subtype_metadata(self, catalogue, cancers, dropnan=False): 
-        catalogue = catalogue[catalogue["cancer_type"].isin(cancers)].copy()
-        catalogue = catalogue.drop_duplicates(subset="group_id")
-        catalogue = catalogue.set_index("group_id")
-
-        # Initialize subtype for multi-cancer merging (for batch effect)
-        if 'subtype' not in catalogue.columns:
-            catalogue['subtype'] = pd.NA
-
-        for cancer in cancers:
-            subtype_file = os.path.join(self.root, f"{cancer.lower()}_subtype.csv")
-            print(f"Checking subtype file: {subtype_file}")
-
-            if not os.path.isfile(subtype_file):
-                print(f"Warning: Subtype file not found for {cancer}")
-                continue
-
-            df = self.load(abs_path=subtype_file, sep=",", index_col=None)
-            df = df[['group_id', 'subtype']].dropna()
-            df = df.drop_duplicates(subset="group_id")
-            df = df.set_index("group_id")
-
-            # Align subtype info 
-            catalogue['subtype'] = catalogue['subtype'].combine_first(df['subtype'])
-
-        catalogue = catalogue.reset_index()
-
-        if dropnan:
-            catalogue = catalogue.dropna(subset=["subtype"])
-
-        return catalogue.reset_index(drop=True)
     
     def _gen_catalogue(self):
         tcga = TCGA()
