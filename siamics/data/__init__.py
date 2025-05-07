@@ -57,10 +57,14 @@ class Caching:
 
     def is_cached(self, id):
         return id in self.items
+    
+    def clear(self):
+        self.items = {}
+        return True
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, root=None, embed_name=None, augment=False, subtype=False, label_col_str):
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
@@ -374,7 +378,7 @@ class DataWrapper(Dataset):
         if sub_sampled:
             print("Warning:: loading a sub-sampled dataset. ")
             for d in self.datasets:
-                d.catalogue = d.catalogue[:512]
+                d.catalogue = d.catalogue[:128]
 
         self.lengths = [len(dataset) for dataset in self.datasets]
         self.cumulative_lengths = np.cumsum(self.lengths)
@@ -441,6 +445,13 @@ class DataWrapper(Dataset):
         idx = np.array(idx)
         return data_df, meta, idx
 
+    def clear_cache(self):
+        """
+        Clear the cache of loaded items.
+        """
+        self.caching.clear()
+        return True
+    
     def get_active_dataset(self, idx):
         # Needs to handle idx as a list of indeces or just a single index.
         if isinstance(idx, list):
