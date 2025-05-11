@@ -91,7 +91,7 @@ class TME(Data):
         metadata_alignCT = metadata_alignCT[metadata_alignCT["filename"].notna()]
 
         self.catalogue = pd.DataFrame({
-            'dataset': self.dataset_name,  # ← Correct: use dataset_name, not "TME"
+            'dataset': self.dataset_name, 
             'sample_id': metadata_alignCT["sample_id"],
             'B_prop': metadata_alignCT["B"],
             'CD4_prop': metadata_alignCT["CD4T"],
@@ -166,7 +166,7 @@ class GSE107011(TME):
         super().__init__(dataset_name="GSE107011", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, celltype_mapping=celltype_mapping, augment=augment)
 
     def process_expression(self):
-        #Get Sample Name, GSM mapping:
+        # Get Sample Name, GSM mapping:
         with open("/projects/ovcare/users/tina_zhang/data/TME/GSE107011/GSE107011_series_matrix.txt", "r") as f:
             lines = f.readlines()
 
@@ -182,24 +182,24 @@ class GSE107011(TME):
             "Sample Name": sample_titles
         })
 
-        #only keep PBMC samples
+        # only keep PBMC samples
         meta_geo = meta_geo[meta_geo["Sample Name"].str.contains("PBMC")].reset_index(drop=True)
         #only keep substring before first _ in Sample Nmae
         meta_geo["Sample Name"] = meta_geo["Sample Name"].str.split('_').str[0] 
 
-        #include GSM in labels df
+        # include GSM in labels df
         meta_labels = pd.read_csv("data/TME/GSE107011/GSE107011_labels.csv")
         meta_labels = pd.merge(meta_labels, meta_geo, on="Sample Name", how="left")
         gsm_to_sample_name = dict(zip(meta_labels["series_sample_id"], meta_labels["Sample Name"]))
 
-        #Map Ensembl ID
+        # Map Ensembl ID
         exp = pd.read_csv("/projects/ovcare/users/tina_zhang/data/TME/GSE107011/GSE107011_norm_counts_TPM_GRCh38.p13_NCBI.tsv", sep = "\t")
         exp["GENE_ID"] = exp["GeneID"].map(self.geoID_map)
         exp = exp.dropna(subset=["GENE_ID"])
         exp = exp.drop(columns=["GeneID"])
         exp = exp.set_index("GENE_ID")
 
-        #Convert col names in exp from GSM to sample name + only extract columns with cell prop labels
+        # Convert col names in exp from GSM to sample name + only extract columns with cell prop labels
         valid_gsm_ids = set(meta_labels["series_sample_id"])
 
         gsm_cols_to_keep = [col for col in exp.columns if col.startswith("GSM") and col in valid_gsm_ids]
