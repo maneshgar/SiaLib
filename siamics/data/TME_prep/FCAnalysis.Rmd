@@ -1,0 +1,142 @@
+```{r}
+library(CytoML)
+library(flowWorkspace)
+library(flowCore)
+library(dplyr)
+
+options(flowWorkspace.openWorkspace.cache = FALSE)
+options(flowWorkspace.log = FALSE)
+
+wsp_dir <- "~/Documents/FlowCy/wsp_files/"
+fcs_dir <- "~/Documents/FlowCy/cyto_files/"
+wsp_files <- list.files(wsp_dir, pattern = "\\.wsp$", full.names = TRUE)
+
+# track used FCS filenames
+used_fcs_files <- character()
+
+make_fcs_selector <- function(used_tracker, wsp_file) {
+  # Extract the numeric suffix between the last two dots of the wsp file
+  wsp_suffix <- sub(".*\\.(\\d+)\\.wsp$", "\\1", wsp_file)
+  
+  function(x) {
+    matched <- NULL
+    for (f in x) {
+      f_suffix <- sub(".*\\.(\\d+)\\.fcs$", "\\1", f)
+      if (f_suffix == wsp_suffix) {
+        matched <- f
+        break
+      }
+    }
+    
+    selected <- matched %||% x[1]
+    fname <- basename(selected)
+    
+    if (length(x) > 1) {
+      cat("Multiple candidates for WSP:", basename(wsp_file), "\n")
+      if (!is.null(matched)) {
+        cat("Matched by suffix. Selected FCS:", fname, "\n")
+      } else {
+        cat("No suffix match found. Defaulting to first FCS:", fname, "\n")
+      }
+    }
+    
+    used_tracker <<- c(used_tracker, fname)
+    return(selected)
+  }
+}
+
+# Function to process a batch of wsp files
+process_wsp_batch <- function(batch_files) {
+  batch_stats <- list()
+  
+  for (wsp_path in batch_files) {
+    cat("\n===========================\n")
+    cat("Processing:", basename(wsp_path), "\n")
+    cat("===========================\n")
+    
+    ws <- tryCatch({
+      open_flowjo_xml(wsp_path)
+    }, error = function(e) {
+      cat("Failed to open WSP:", e$message, "\n")
+      return(NULL)
+    })
+    if (is.null(ws)) next
+
+    # Create a file selector using current global tracker and current WSP file
+    file_selector <- make_fcs_selector(used_fcs_files, wsp_path)
+    
+    gs <- tryCatch({
+      suppressWarnings(flowjo_to_gatingset(
+        ws,
+        name = "All Samples",
+        path = fcs_dir,
+        fcs_file_select = file_selector
+      ))
+    }, error = function(e) {
+      cat("Conversion failed:", e$message, "\nTrying without compensation...\n")
+      return(NULL)
+    })
+    
+    if (is.null(gs)) {
+      gs <- tryCatch({
+        suppressWarnings(flowjo_to_gatingset(
+          ws,
+          name = "All Samples",
+          path = fcs_dir,
+          compensation = FALSE,
+          fcs_file_select = file_selector
+        ))
+      }, error = function(e) {
+        cat("Still failed:", e$message, "\n")
+        return(NULL)
+      })
+    }
+    
+    if (!is.null(gs)) {
+      stats <- tryCatch({
+        gs_pop_get_stats(gs, stat_type = "percent")
+      }, error = function(e) {
+        cat("⚠️  Failed to extract stats:", e$message, "\n")
+        return(NULL)
+      })
+      
+      if (!is.null(stats)) {
+        stats$wsp_file <- basename(wsp_path)
+        batch_stats[[length(batch_stats) + 1]] <- stats
+      }
+      
+      rm(gs, ws, stats)
+      gc(verbose = FALSE)
+    }
+  }
+  
+  return(batch_stats)
+}
+
+# Process WSP files in batches of 10
+all_stats <- list()
+batch_size <- 10
+num_batches <- ceiling(length(wsp_files) / batch_size)
+
+for (i in seq_len(num_batches)) {
+  start_idx <- (i - 1) * batch_size + 1
+  end_idx <- min(i * batch_size, length(wsp_files))
+  batch_files <- wsp_files[start_idx:end_idx]
+  
+  cat(sprintf("\n Processing batch %d of %d (%d files)\n", i, num_batches, length(batch_files)))
+  batch_stats <- process_wsp_batch(batch_files)
+  all_stats <- c(all_stats, batch_stats)
+}
+
+# Combine and export
+if (length(all_stats) > 0) {
+  combined_stats <- bind_rows(all_stats)
+  output_csv <- "~/Documents/Grad/RNABERT/FlowCy/combined_wsp_stats.csv"
+  write.csv(combined_stats, output_csv, row.names = FALSE)
+  cat("\n Finished extracting proportions from", length(all_stats), "workspaces.\n")
+  cat("Saved to:", output_csv, "\n")
+} else {
+  cat("No valid GatingSets extracted.\n")
+}
+```
+
