@@ -51,7 +51,7 @@ class ImmuneSim:
         }
 
     # for sparse mode, select cell types - for all cell types with at least one cell, randomly sample a number of classes to be included, then randomly sample which class to inlucde (wihtout replacement, so a class doesn't get selected mulitpled times)
-    # for regular mode: just return al,l cell types within at least 1 cell
+    # for regular mode: just return all cell types with at least 1 cell
     def _select_celltypes(self, valid_celltypes, sparse):
         if sparse:
             if len(valid_celltypes) == 1:
