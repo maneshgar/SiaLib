@@ -452,6 +452,7 @@ class GEO_BATCH(GEO):
                 print(f"Merge succeeded but 'subtype' column missing in result for {cancer_type}")
 
         catalogue[["centre"]] = catalogue[["group_id"]]
+        catalogue[["TSS"]] = catalogue[["group_id"]]
         return catalogue.reset_index(drop=True)
 
     def _gen_catalogue(self): 

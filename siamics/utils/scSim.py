@@ -9,36 +9,41 @@ from collections import defaultdict
 
 from siamics.utils import singleCell
 
-class ImmuneSim:
-    def __init__(self, celltypes=None, rootdir = None):
-        # self.all_celltypes = ['B.cells', 'CD4.T.cells', 'CD8.T.cells', 'NK.cells', 'neutrophils', 'monocytic.lineage', 'fibroblasts', 'endothelial.cells', 'others']
-        self.all_celltypes = ['B', 'CD4', 'CD8', 'NK', 'neutrophils', 'monocytic', 'fibroblasts', 'endothelial', 'others']
+class TMESim:
+    def __init__(self, celltypes=None, rootdir=None, dataset_name="default", sample_record_path=None):
+        self.all_celltypes = [
+            "B", "CD4T", "CD8T", "Tothers", "NK", "granulocytes",
+            "monocytic", "fibroblasts", "endothelial", "others"
+        ]
         
         if celltypes:
             self.celltypes = celltypes
         else: 
             self.celltypes = self.all_celltypes        
 
-        self.label_path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Admixture_Proportions.xlsx"
-        self.label_sheet = "singleCell"
+        # self.label_path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Admixture_Proportions.xlsx"
+        # self.label_sheet = "singleCell"
+
+        self.base = os.path.join(rootdir, dataset_name) if rootdir else dataset_name
+        os.makedirs(self.base, exist_ok=True)
         
-        if rootdir:
-            self.rootdir = rootdir
-        else:
-            self.rootdir = "/projects/ovcare/users/tina_zhang/data/immune_deconv/single-cell/Bulk"
-        os.makedirs(self.rootdir, exist_ok=True)
+        # shared across all datasets
+        self.sample_record_path = sample_record_path or os.path.join(rootdir, "used_sample_names.csv")
+        if not os.path.exists(self.sample_record_path):
+            pd.DataFrame(columns=["sample_id"]).to_csv(self.sample_record_path, index=False)
 
-    # cell type annotation against batrcpdes
+        # dataset-specific
+        self.proportion_csv_path = os.path.join(self.base, f"{dataset_name}_proportions.csv")
+        if not os.path.exists(self.proportion_csv_path):
+            pd.DataFrame().to_csv(self.proportion_csv_path, index=False)
+
+    # cell type annotation against barcpdes
     def _load_annotations(self):
-        return pd.read_csv(
-            "/projects/ovcare/users/tina_zhang/data/immune_deconv/single-cell/Zheng68k_filtered/68k_pbmc_barcodes_annotation.tsv",
-            sep="\t"
-        )
-
+        return pd.read_csv("/projects/ovcare/users/tina_zhang/data/immune_deconv/single-cell/Zheng68k_filtered/68k_pbmc_barcodes_annotation.tsv", sep="\t")
     # load existing sample ids
     def _load_existing_labels(self):
         try:
-            df = pd.read_excel(self.label_path, sheet_name=self.label_sheet)
+            df = pd.read_csv(self.sample_record_path)
             return df, set(df['sample_id'].astype(str))
         except (FileNotFoundError, ValueError):
             return pd.DataFrame(), set()
@@ -46,7 +51,7 @@ class ImmuneSim:
     # count number of cells per cell type in the dataset
     def _count_celltypes(self, annotations):
         return {
-            ct: (annotations["updated_celltype"] == ct).sum()
+            ct: (annotations["aligned_ct"] == ct).sum()
             for ct in self.all_celltypes
         }
 
@@ -71,7 +76,7 @@ class ImmuneSim:
     def _sample_barcodes(self, annotations, scaled_counts):
         sampled_barcodes = [] 
         for ct, count in scaled_counts.items():
-            barcodes = annotations.loc[annotations["updated_celltype"] == ct, "barcodes"].tolist()
+            barcodes = annotations.loc[annotations["aligned_ct"] == ct, "cellID"].tolist()
             sampled_barcodes.extend(random.sample(barcodes, count)) # raondomly sample count barcodes without replacement from the list of available barcodes for that cell type
         return sampled_barcodes
 
@@ -106,13 +111,13 @@ class ImmuneSim:
             sample[ct] = prop
         return sample
 
-    def _save_proportions(self, proportions_df, existing_df):
-        with pd.ExcelWriter(self.label_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-            updated_df = pd.concat([existing_df, proportions_df], ignore_index=True) if not existing_df.empty else proportions_df
-            updated_df.to_excel(writer, sheet_name=self.label_sheet, index=False)
+    # def _save_proportions(self, proportions_df, existing_df):
+    #     with pd.ExcelWriter(self.label_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+    #         updated_df = pd.concat([existing_df, proportions_df], ignore_index=True) if not existing_df.empty else proportions_df
+    #         updated_df.to_excel(writer, sheet_name=self.label_sheet, index=False)
 
-    def gen_proportion(self, nsample, cellcount=500, sparse=False):
-        annotations = self._load_annotations()
+    def gen_proportion(self, annotations, nsample, cellcount=500, patient_id=None, sparse=False):
+        # annotations = self._load_annotations()
         existing_df, existing_sample_ids = self._load_existing_labels()
         celltype_counts = self._count_celltypes(annotations)
 
@@ -128,60 +133,82 @@ class ImmuneSim:
                 continue
 
         proportions_df = pd.DataFrame(proportions)
-        self._save_proportions(proportions_df, existing_df)
+        # self._save_proportions(proportions_df, existing_df)
+        proportions_df["patient_id"] = patient_id
+
+        # Save sample_ids to tracking file
+        updated_df = pd.concat([existing_df, proportions_df[["sample_id"]]], ignore_index=True)
+        updated_df.to_csv(self.sample_record_path, index=False)        
+
+        # Append generated proportions to dataset-specific file
+        try:
+            if os.path.exists(self.proportion_csv_path) and os.path.getsize(self.proportion_csv_path) > 0:
+                existing_props = pd.read_csv(self.proportion_csv_path)
+                all_props = pd.concat([existing_props, proportions_df], ignore_index=True)
+            else:
+                all_props = proportions_df
+        except pd.errors.EmptyDataError:
+            all_props = proportions_df
+
+        all_props.to_csv(self.proportion_csv_path, index=False)
+
         return proportions_df
 
-    def gen_data(self, expression_dir):
+    def gen_data(self, sc_expression, proportions_df):
         # /projects/ovcare/classification/tzhang/data/immune_deconv/single-cell/Zheng68k_filtered
-        sc_expression = singleCell.expression_extraction(expression_dir)
-        df = pd.read_excel(self.label_path, sheet_name=self.label_sheet)
+        # sc_expression = singleCell.expression_extraction(expression_dir)
+        # df = pd.read_excel(self.label_path, sheet_name=self.label_sheet)
         
         data_list = []
-        for _, row in df.iterrows():
+        for _, row in proportions_df.iterrows():
             sample_id = row["sample_id"]
-            output_path = os.path.join(self.rootdir, f"{sample_id}.csv")
+            output_path = os.path.join(self.base, f"{sample_id}.csv")
             
-            # Check if the file already exists
             if os.path.exists(output_path):
                 continue  
 
             barcode_list = row["cell_barcodes"].split(",")
+
+            valid_barcodes = [bc for bc in barcode_list if bc in sc_expression.index]
+            if not valid_barcodes:
+                continue
+
+            sample_exp = sc_expression.loc[valid_barcodes]
+            agg_exp = sample_exp.sum(axis=0).values
             
-            sample_exp = sc_expression[barcode_list, :]
-            agg_exp = np.array(sample_exp.X.sum(axis=0)).flatten()
-            
-            data_list.append({"sample_id": row["sample_id"], **dict(zip(sc_expression.var_names, agg_exp))})
+            gene_ids = sc_expression.columns
+            data_list.append({"sample_id": sample_id, **dict(zip(gene_ids, agg_exp))})
         
         aggregated_df = pd.DataFrame(data_list)
         return aggregated_df
 
-    def tpm(self, expression):
-        path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Human.GRCh38.p13.annot.tsv" #Taken from GEO
-        gene_annotation = pd.read_csv(path, sep="\t")
-        gene_lengths = dict(zip(gene_annotation["EnsemblGeneID"], gene_annotation["Length"]))
+    # def tpm(self, expression):
+    #     path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Human.GRCh38.p13.annot.tsv" #Taken from GEO
+    #     gene_annotation = pd.read_csv(path, sep="\t")
+    #     gene_lengths = dict(zip(gene_annotation["EnsemblGeneID"], gene_annotation["Length"]))
 
-        gene_columns = expression.columns.difference(["sample_id"])
-        gene_lengths_df = pd.Series(gene_lengths, index=gene_columns)
+    #     gene_columns = expression.columns.difference(["sample_id"])
+    #     gene_lengths_df = pd.Series(gene_lengths, index=gene_columns)
         
-        # normalize by gene length
-        rpk = expression[gene_columns].div(gene_lengths_df, axis=1)
+    #     # normalize by gene length
+    #     rpk = expression[gene_columns].div(gene_lengths_df, axis=1)
         
-        # normalize by depth
-        scaling_factor = rpk.sum(axis=1)    
-        tpm = rpk.div(scaling_factor, axis=0) * 1e6
+    #     # normalize by depth
+    #     scaling_factor = rpk.sum(axis=1)    
+    #     tpm = rpk.div(scaling_factor, axis=0) * 1e6
         
-        expression[gene_columns] = tpm
-        expression = expression.dropna(axis=1) #remove columns = NA (due to length = NA)
+    #     expression[gene_columns] = tpm
+    #     expression = expression.dropna(axis=1) #remove columns = NA (due to length = NA)
 
-        return expression
+    #     return expression
     
-    def split_samples(self, expression):
-        for _, row in expression.iterrows():
-            sample_id = row["sample_id"]
-            sample_df = pd.DataFrame([row])
+    # def split_samples(self, expression):
+    #     for _, row in expression.iterrows():
+    #         sample_id = row["sample_id"]
+    #         sample_df = pd.DataFrame([row])
             
-            output_path = os.path.join(self.rootdir, f"{sample_id}.csv")
+    #         output_path = os.path.join(self.base, f"{sample_id}.csv")
             
-            sample_df.to_csv(output_path, index=False)
+    #         sample_df.to_csv(output_path, index=False)
     
-        return
+    #     return

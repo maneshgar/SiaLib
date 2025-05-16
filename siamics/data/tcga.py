@@ -368,17 +368,21 @@ class TCGA_BATCH(TCGA):
                     parts = entity_id.split("-")
                     patient_id = "-".join(parts[:3])
                     centre = parts[-1]
+                    tss = parts[1]
+
                     batch_info.append({
                         "group_id": patient_id,
                         "centre": centre,
                         "entity_submitter_id": entity_id,
-                        "platform": "HiSeq2000" if centre == "07" else None
+                        "platform": "HiSeq2000" if centre == "07" else None,
+                        "TSS": tss
                     })
 
         batch_meta = pd.DataFrame(batch_info)
 
         catalogue = catalogue.merge(batch_meta, how='left', on='group_id')
-        catalogue = catalogue.dropna(subset=["centre"])
+        catalogue["TSS"].replace(["", "NA", "N/A", "None"], np.nan, inplace=True)
+        catalogue = catalogue.dropna(subset=["centre", "TSS"])
         return catalogue.reset_index(drop=True)
 
     def _gen_catalogue(self):

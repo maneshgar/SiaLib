@@ -221,10 +221,15 @@ class TMEDeconv:
         self.pred_prop = np.vstack((self.pred_prop, pred_p))
 
     def update_metrics(self):
-        squared_error = (self.pred_prop - self.true_prop) ** 2
+        true_prop = np.array(self.true_prop)
+        print(true_prop.shape)
+        pred_prop = np.array(self.pred_prop)
+        print(pred_prop.shape)
+
+        squared_error = (pred_prop - true_prop) ** 2
         sample_rmse = np.sqrt(np.mean(squared_error, axis=-1))  
         self.rmse = np.mean(sample_rmse)
-        self.cell_type_pcc = [pearsonr(self.true_prop[:, i], self.pred_prop[:, i])[0] for i in range(self.true_prop.shape[1])]
+        self.cell_type_pcc = [pearsonr(true_prop[:, i], pred_prop[:, i])[0] for i in range(true_prop.shape[1])]
         self.pcc = np.mean(self.cell_type_pcc)
         self.report = f"RMSE: {self.rmse}\nPCC: {self.pcc}"
 
@@ -322,3 +327,5 @@ class GeneEssentiality:
         self.perDep_scc = np.nanmean(gene_corrs)
 
         self.report = f"MSE: {self.mse}\nSCC: {self.scc}\nper-DepOI: {self.perDep_scc}"
+
+    
