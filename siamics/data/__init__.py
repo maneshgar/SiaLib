@@ -69,10 +69,10 @@ class Data(Dataset):
         self.embed_name = embed_name
         self.augment = augment
         self.catname = catname
+        self.valid_modes=['raw', 'features', 'mean_features']
 
         self.data_mode="raw"
-        if embed_name: self.data_mode="features"
-        self.valid_modes=['raw', 'features']
+        if embed_name: self.data_mode="mean_features"
         self.remove_subids = True
         self.indeces_map = None
 
@@ -129,6 +129,10 @@ class Data(Dataset):
             file_path = os.path.join(self.root, epath)
             data = self.load_pickle(file_path)
 
+        elif self.data_mode == 'mean_features':
+            epath = self.get_embed_fname(self.catalogue.loc[idx, 'filename'], mean=True)
+            file_path = os.path.join(self.root, epath)
+            data = self.load_pickle(file_path)
         # Getting label 
         metadata = self.catalogue.loc[idx:idx] # TODO replace with this::: metadata = self.catalogue.iloc[idx:idx+1]
         
@@ -260,13 +264,16 @@ class Data(Dataset):
 
         return self.trainset, self.validset, self.testset
 
-    def get_embed_fname(self, path, fm_config_name=None):
+    def get_embed_fname(self, path, fm_config_name=None, mean=False):
         if self.embed_name:
             model_name = self.embed_name
         else: 
             model_name = fm_config_name
 
-        return f'features/{model_name}/{path[5:-3]}pkl'
+        if mean:
+            return f'features/{model_name}/{path[5:-4]}_mean.pkl'
+        else: 
+            return f'features/{model_name}/{path[5:-4]}.pkl'
 
     def set_data_mode(self, mode):
         if mode in self.valid_modes:
