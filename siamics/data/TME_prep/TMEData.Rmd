@@ -1,0 +1,37 @@
+```{r}
+library(TMExplorer)
+```
+
+```{r}
+res_all <- queryTME(score_type = "Raw counts", has_truth = TRUE, metadata_only = TRUE)
+
+all_accessions <- sapply(res_all, function(x) x[["accession"]])
+
+# Filter for those starting with "GSE"
+gse_accessions <- all_accessions[grepl("^GSE", all_accessions)]
+
+save_dir <- "~/TMEData"
+if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+
+# Step 4: Loop with verbose printing and file existence check
+for (accession in gse_accessions) {
+  cat("Processing", accession, "\n")
+  
+  save_path <- file.path(save_dir, paste0(accession, ".rds"))
+  
+  if (file.exists(save_path)) {
+    cat("File already exists, skipping:", save_path, "\n")
+    next
+  }
+  
+  tryCatch({
+    res <- queryTME(geo_accession = accession)[[1]]
+    saveTME(res, save_path)
+    cat("Saved:", save_path, "\n")
+  }, error = function(e) {
+    cat("Error for", accession, ":", e$message, "\n")
+  })
+}
+
+```
+
