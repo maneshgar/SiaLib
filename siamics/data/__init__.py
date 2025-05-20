@@ -42,7 +42,7 @@ def drop_sparse_data(catalogue, stats, nb_genes, threshold=0.5):
     return cat[filter].drop('zeros_count', axis=1).reset_index()
 
 class Caching:
-    def __init__(self, size=25000):
+    def __init__(self, size=5000):
         self.items = {}
         self.max_size = size
 
@@ -351,26 +351,31 @@ class Data(Dataset):
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, root=None, augment=False, embed_name=None, sub_sampled=False):
+    def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, sub_sampled=False, do_caching=True):
         """
         Initialize the DataWrapper with a list of datasets.
         
         Args:
             datasets (list): List of datasets to be wrapped.
         """
-        self.caching = Caching()
+        if do_caching:
+            self.caching = Caching()
+        else: 
+            self.caching = None
+
+        self.cancer_types = cancer_types
 
         self.datasets_cls = datasets # GTEX, TCGA, etc.
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
         if subset == 'full':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'validset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
         else:
             raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'train', 'valid', or 'test'.")
 
@@ -380,9 +385,8 @@ class DataWrapper(Dataset):
             for d in self.datasets:
                 d.catalogue = d.catalogue[:128]
 
-        self.lengths = [len(dataset) for dataset in self.datasets]
-        self.cumulative_lengths = np.cumsum(self.lengths)
         self.augment = augment
+        self.update_lenghts()
 
     def __len__(self):
         """
@@ -405,8 +409,10 @@ class DataWrapper(Dataset):
         """
 
         # check if the data is cached
-        if self.caching.is_cached(id):
-            return self.caching.get_item(id)
+        if self.caching:
+            if self.caching.is_cached(id):
+                item = self.caching.get_item(id)
+                return (item, id)
         
         # Determine which dataset the index belongs to
         dataset, dataset_id = self.get_active_dataset(id)
@@ -419,31 +425,49 @@ class DataWrapper(Dataset):
         
         # Return the sample from the appropriate dataset
         item = dataset[sample_id]
-
         # Cache the sample
-        self.caching.cache_item(id, item)
-        return item
+    
+        if self.caching:
+            self.caching.cache_item(id, item)
+    
+        return (item, id)
 
-    def collate_fn(self, batch, num_devices=None):
+    def update_lenghts(self):
+        """
+        Update the lengths of the datasets.
+        """
+        self.lengths = [len(dataset) for dataset in self.datasets]
+        self.cumulative_lengths = np.cumsum(self.lengths)
+        return True
+    
+    def collate_fn(self, items, num_devices=None):
         data = []
         meta = []
-        idx = []
-        for i in range(len(batch)):
-            data.append(batch[i][0])
-            meta.append(batch[i][1])
-            idx.append(batch[i][2])
+        dataset_specific_idx = []
+        overall_idx = []
+
+        for i in range(len(items)):
+            batch = items[i][0]
+            item_id = items[i][1]
+            data.append(batch[0])
+            meta.append(batch[1])
+            dataset_specific_idx.append(batch[2])
+            overall_idx.append(item_id)
 
         # if number of devices is given, the batch will be padded to fit all devices. 
         if num_devices:
             while len(data) % num_devices != 0:
-                data.append(batch[0][0])
-                meta.append(batch[0][1])
-                idx.append(-1)
+                batch = items[0][0]
+                data.append(batch[0])
+                meta.append(batch[1])
+                dataset_specific_idx.append(-1)
+                overall_idx.append(-1)
 
         data_df = pd.concat(data)
         meta = pd.concat(meta)
-        idx = np.array(idx)
-        return data_df, meta, idx
+        dataset_specific_idx = np.array(dataset_specific_idx)
+        overall_idx = np.array(overall_idx)
+        return data_df, meta, dataset_specific_idx, overall_idx
 
     def clear_cache(self):
         """
@@ -495,6 +519,12 @@ class DataWrapper(Dataset):
         for dataset in self.datasets:
             dataset.set_data_mode(mode)
 
+    def set_survival_mode(self, mode):
+        for dataset in self.datasets:
+            dataset.set_survival_mode(mode)
+        self.update_lenghts()
+        return True
+
     def get_text_embeddings(self, gsm_ids, idx, encoder="PubMedBERT"):
         # Get the text embeddings for the given GSM IDs
         text_embeddings = []
@@ -533,12 +563,14 @@ class DataWrapper(Dataset):
                 sample_ids.extend(dataset.catalogue['sample_id'].tolist())
         return sample_ids
 
-    def get_survival_metadata(self, metadata, idx):
+    def get_survival_metadata(self, metadata, overall_idx):
         times = []
         events = []
-        datasets, dataset_idx = self.get_active_dataset(idx)
-        for d, id in zip(datasets, idx):
-            e, t = d.get_survival_metadata(metadata.loc[id:id])
+
+        for i, (id, row) in enumerate(metadata.iterrows()):
+            # Process each row of the metadata DataFrame
+            dataset, dataset_idx = self.get_active_dataset(overall_idx[i])
+            e, t = dataset.get_survival_metadata(row)
             events.append(e)
-            times.append(t) 
+            times.append(t)
         return events, times

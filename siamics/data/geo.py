@@ -382,9 +382,9 @@ class GEO_SUBTYPE_COAD(GEO):
         return
     
 class GEO_SURV(GEO):
-    def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, root=None, augment=False, mode="overall"):
+    def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, embed_name=None, root=None, augment=False, mode="overall"):
         
-        self.subset="SURV"
+        self.cancer_types = cancer_types
         self.series = ["GSE154261", "GSE87340", "GSE165808"]
         self.ost_str = "os_time"
         self.oss_str = "os_status"
@@ -393,20 +393,41 @@ class GEO_SURV(GEO):
         self.time_unit = "days"
         self.mode = mode
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        
+        if self.cancer_types is not None:
+            self.filter_by_cancer_types(cancer_types=self.cancer_types)
+
+    def filter_by_cancer_types(self, cancer_types):
+        self.catalogue = self.catalogue[self.catalogue["cancer_type"].isin(cancer_types)].reset_index(drop=True)
+
+    def set_survival_mode(self, mode="overall"):
+        self.mode = mode
+        # remove the nans and reset index
         if self.mode == "overall":  
             self.catalogue = self.catalogue[self.catalogue[self.oss_str] != -1].reset_index(drop=True)
-        elif self.mode == "progression":
+        elif self.mode == "pfi":
             self.catalogue = self.catalogue[self.catalogue[self.pfs_str] != -1].reset_index(drop=True)
-
-        # remove the nans and reset index
 
     def get_survival_metadata(self, metadata):
         if self.mode == "overall":
-            event = metadata[self.oss_str].item()
-            times = metadata[self.ost_str].item()
-        elif self.mode == "progression":
-            event = metadata[self.pfs_str].item()
-            times = metadata[self.pft_str].item()
+            event = int(metadata[self.oss_str])
+            times = metadata[self.ost_str]
+        elif self.mode == "pfi":
+            event = int(metadata[self.pfs_str])
+            times = metadata[self.pft_str]
+
+
+        if self.time_unit == "days":
+            times = times 
+        elif self.time_unit == "weeks":
+            times = times * 7
+        elif self.time_unit == "months":
+            times = times * 30.44
+        elif self.time_unit == "years":
+            times = times * 365
+        else:
+            raise ValueError("Invalid time unit. Choose from 'days', 'weeks', 'months', or 'years'.")
+
         return event, times
     
     def _gen_catalogue(self): 
