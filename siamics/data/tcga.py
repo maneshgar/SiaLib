@@ -322,9 +322,9 @@ class TCGA_SUBTYPE(TCGA):
 
 class TCGA_SUBTYPE_BRCA(TCGA_SUBTYPE):
     def __init__(self, catalogue=None, catname="catalogue_subtype_brca", cancer_types=['BRCA'], subtypes=None, classes=None, root=None, embed_name=None, augment=False):
-         if subtypes:
+        if subtypes:
             classes = subtypes
-        else: 
+        else:
             classes =  subtypes = ["LuminalA", "LuminalB", "HER2", "Normal", "Basal"]
         self.cancer_types = cancer_types
         super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
@@ -335,7 +335,7 @@ class TCGA_SUBTYPE_BRCA(TCGA_SUBTYPE):
 
 class TCGA_SUBTYPE_BLCA(TCGA_SUBTYPE):
     def __init__(self, catalogue=None, catname="catalogue_subtype_blca", cancer_types=['BLCA'], subtypes=None, classes=None, root=None, embed_name=None, augment=False):
-         if subtypes:
+        if subtypes:
             classes = subtypes
         else: 
             classes =  subtypes = ["Basal", "Luminal"]
