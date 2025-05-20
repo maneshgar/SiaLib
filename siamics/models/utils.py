@@ -103,7 +103,7 @@ def CosineAnnealingWarmupRestarts_fn(
     return schedule_fn
 
 # Initialize optimizer state
-def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_type, momentum=0.999, weight_decay=0.01, warmup=True, clip_norm=1.0):
+def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_type, b1=0.9, b2=0.999, weight_decay=0.01, warmup=True, clip_norm=1.0):
     # Optimizer setup
     
     if scheduler_type == 'cosine':
@@ -119,7 +119,7 @@ def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_
     
     optimizer = optax.chain(
         optax.clip_by_global_norm(clip_norm),  # Clip gradients to a maximum global norm
-        optax.adamw(lr_scheduler, b2=momentum, weight_decay=weight_decay),  # AdamW optimizer with weight decay
+        optax.adamw(lr_scheduler, b1=b1, b2=b2, weight_decay=weight_decay),  # AdamW optimizer with weight decay
     )
     
     return optimizer, optimizer.init(params), lr_scheduler
