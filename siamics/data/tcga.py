@@ -11,7 +11,7 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, catname="catalogue", classes=None, cancer_types=None,root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue", classes=None, cancer_types=None, subtypes=None,root=None, embed_name=None, augment=False):
         self.geneID = "gene_id"
         self.grouping_col = "patient_id" # was patient_id
 
@@ -24,11 +24,15 @@ class TCGA(Data):
 
         if cancer_types: 
             self.cancer_types = cancer_types
-        else:
+
+        elif subtypes is None:
             self.cancer_types = [item for sublist in self.classes for item in (sublist if isinstance(sublist, list) else [sublist])]
     
+        if subtypes:
+            self.subtypes = subtypes
+
         self.nb_classes = len(self.classes)
-        super().__init__("TCGA", catalogue=catalogue, catname=catname, cancer_types=self.cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__("TCGA", catalogue=catalogue, catname=catname, cancer_types=self.cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
         self._gen_class_indeces_map(self.classes)
 
     def _gen_catalogue(self, dirname, ext='.csv'):
@@ -234,20 +238,20 @@ class TCGA(Data):
             print(f"Saved metadata to: {json_path}")
 
 class TCGA5(TCGA):
-    def __init__(self, catalogue=None, classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes = ['BRCA', 'BLCA', ['GBM','LGG'], 'LUAD', 'UCEC'] # BRCA, BLCA, GBMLGG, LUAD, and UCEC
-        super().__init__(catalogue=catalogue, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue=catalogue, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
         self._gen_class_indeces_map(self.cancer_types)
 
 class TCGA6(TCGA):
-    def __init__(self, catalogue=None, classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes = ['BRCA', 'THCA', 'GBM', 'LGG', 'LUAD', 'UCEC']
-        super().__init__(catalogue=catalogue, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue=catalogue, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
         self._gen_class_indeces_map(self.cancer_types)
 
 class TCGA_SURV(TCGA):
 
-    def __init__(self, catalogue=None, catname="catalogue_surv", cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_surv", cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         self.subset="SURV"
         self.oss_str = "Overall Survival Status"
         self.ost_str = "Overall Survival (Months)"
@@ -256,7 +260,7 @@ class TCGA_SURV(TCGA):
         self.time_unit = "months"
         self.mode = "overall"
 
-        super().__init__(catalogue=catalogue, catname=catname, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue=catalogue, catname=catname, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _read_survival_metadata(self, catalogue, dir="clinical_data", dropnan=True):
         survival_files = glob(os.path.join(self.root, dir, "*.tsv"))
@@ -307,8 +311,8 @@ class TCGA_SURV(TCGA):
         self.mode=mode
 
 class TCGA_SUBTYPE(TCGA):
-    def __init__(self, catalogue=None, catname=None, cancer_types=None, classes=None, root=None, embed_name=None, augment=False, subtype=True):
-        super().__init__(catalogue=catalogue, catname=catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+    def __init__(self, catalogue=None, catname=None, cancer_types=None, subtypes=None, classes=None, root=None, embed_name=None, augment=False):
+        super().__init__(catalogue=catalogue, catname=catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
     
     def _gen_catalogue(self):
         tcga = TCGA()
@@ -317,48 +321,60 @@ class TCGA_SUBTYPE(TCGA):
         self._split_catalogue()
 
 class TCGA_SUBTYPE_BRCA(TCGA_SUBTYPE):
-    def __init__(self, catalogue=None, catname="catalogue_subtype_brca", cancer_types=['BRCA'], classes=None, root=None, embed_name=None, augment=False, subtype=True):
-        classes = ["LuminalA", "LuminalB", "HER2", "Normal", "Basal"]
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+    def __init__(self, catalogue=None, catname="catalogue_subtype_brca", cancer_types=['BRCA'], subtypes=None, classes=None, root=None, embed_name=None, augment=False):
+         if subtypes:
+            classes = subtypes
+        else: 
+            classes =  subtypes = ["LuminalA", "LuminalB", "HER2", "Normal", "Basal"]
         self.cancer_types = cancer_types
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class TCGA_SUBTYPE_BLCA(TCGA_SUBTYPE):
-    def __init__(self, catalogue=None, catname="catalogue_subtype_blca", cancer_types=['BLCA'], classes=None, root=None, embed_name=None, augment=False, subtype=True):
-        classes = ["Basal", "Luminal"]
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+    def __init__(self, catalogue=None, catname="catalogue_subtype_blca", cancer_types=['BLCA'], subtypes=None, classes=None, root=None, embed_name=None, augment=False):
+         if subtypes:
+            classes = subtypes
+        else: 
+            classes =  subtypes = ["Basal", "Luminal"]
         self.cancer_types = cancer_types
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class TCGA_SUBTYPE_COAD(TCGA_SUBTYPE):
-    def __init__(self, catalogue=None, catname="catalogue_subtype_coad", cancer_types=['COAD'], classes=None, root=None, embed_name=None, augment=False, subtype=True):
-        classes=["CMS1","CMS2","CMS3","CMS4"]
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
-        self.cancer_types = cancer_types
+    def __init__(self, catalogue=None, catname="catalogue_subtype_coad", cancer_types=['COAD'], subtypes=None, classes=None, root=None, embed_name=None, augment=False):
+        if subtypes:
+            classes = subtypes
+        else: 
+            classes = subtypes = ["CMS1", "CMS2", "CMS3", "CMS4"]
+        self.cancer_types = cancer_types # Can this move up??            
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class TCGA_SUBTYPE_PAAD(TCGA_SUBTYPE):
-    def __init__(self, catalogue=None, catname="catalogue_subtype_paad", cancer_types=['PAAD'], classes=None, root=None, embed_name=None, augment=False, subtype=True):
-        classes=["Classical", "Basal"]
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+    def __init__(self, catalogue=None, catname="catalogue_subtype_paad", cancer_types=['PAAD'], subtypes=None, classes=None, root=None, embed_name=None, augment=False):
+        if subtypes:
+            classes = subtypes
+        else: 
+            classes = subtypes = ["Classical", "Basal"]
         self.cancer_types = cancer_types
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class TCGA_BATCH(TCGA):
-    def __init__(self, catalogue=None, catname=None, classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
-        super().__init__(catalogue=catalogue, catname=catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+    def __init__(self, catalogue=None, catname=None, classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
+        super().__init__(catalogue=catalogue, catname=catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _read_batch_metadata(self, catalogue):
         meta_dir = "/projects/ovcare/users/tina_zhang/data/TCGA/meta"
@@ -409,71 +425,71 @@ class TCGA_BATCH(TCGA):
         self.save(self.catalogue, f'{self.catname}.csv')
 
 class TCGA_BATCH_BRCA(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_brca", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_batch_brca", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes=['BRCA']
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class TCGA_BATCH_PAAD(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_paad", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_batch_paad", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes=['PAAD']
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
     
 class TCGA_BATCH_BLCA(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_blca", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_batch_blca", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes=['BLCA']
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
         
 class TCGA_BATCH_COAD(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_coad", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_batch_coad", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes=['COAD']
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
     
 class TCGA_BATCH_OVARIAN(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_ovarian", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_batch_ovarian", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes=['OVARIAN']
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class TCGA_BATCH_LUAD(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_luad", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_batch_luad", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes=['LUAD']
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class TCGA_BATCH_6(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_6", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
+    def __init__(self, catalogue=None, catname="catalogue_batch_6", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
         classes=['BRCA', 'PAAD', 'LUAD', 'BLCA', 'COAD', 'OVARIAN']
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
     
 class TCGA_BATCH_ALL(TCGA_BATCH):
-    def __init__(self, catalogue=None, catname="catalogue_batch_all", classes=None, cancer_types=None, root=None, embed_name=None, augment=False, subtype=False):
-        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, root=root, embed_name=embed_name, augment=augment, subtype=subtype)
+    def __init__(self, catalogue=None, catname="catalogue_batch_all", classes=None, cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
+        super().__init__(catalogue, catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, root=root, embed_name=embed_name, augment=augment)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
