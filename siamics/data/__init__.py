@@ -351,14 +351,14 @@ class Data(Dataset):
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, sub_sampled=False, do_caching=True):
+    def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, sub_sampled=False, cache_data=True):
         """
         Initialize the DataWrapper with a list of datasets.
         
         Args:
             datasets (list): List of datasets to be wrapped.
         """
-        if do_caching:
+        if cache_data:
             self.caching = Caching()
         else: 
             self.caching = None
