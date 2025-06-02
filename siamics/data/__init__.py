@@ -162,23 +162,34 @@ class Data(Dataset):
     def _gen_catalogue(self):
         raise NotImplementedError
 
-    def _split_catalogue(self, test_size=0.3):
+    def _split_catalogue(self, test_size=0.3, mode="all"): # added mode for TME
         # Split data into 70% train and 30% temp
-        trainset, temp = train_test_split(self.catalogue, test_size=test_size, random_state=42)
+        if mode == "all":
+            trainset, temp = train_test_split(self.catalogue, test_size=test_size, random_state=42)
 
-        # Split the remaining 30% into 15% valid and 15% test
-        validset, testset = train_test_split(temp, test_size=0.5, random_state=42)
+            # Split the remaining 30% into 15% valid and 15% test
+            validset, testset = train_test_split(temp, test_size=0.5, random_state=42)
 
-        self.trainset = trainset.reset_index(drop=True)
-        self.validset = validset.reset_index(drop=True)
-        self.testset  = testset.reset_index(drop=True)
-
+            self.trainset = trainset.reset_index(drop=True)
+            self.validset = validset.reset_index(drop=True)
+            self.testset  = testset.reset_index(drop=True)
+        
+        elif mode == "test_only":
+            self.trainset = pd.DataFrame()  
+            self.validset = pd.DataFrame()  
+            self.testset  = self.catalogue.reset_index(drop=True)
+        
+        else:
+            trainset, validset = train_test_split(self.catalogue, test_size=test_size, random_state=42)
+            self.trainset = trainset.reset_index(drop=True)
+            self.validset = validset.reset_index(drop=True)
+            self.testset  = pd.DataFrame()
+        
         self.save(self.trainset, f'{self.catname}_train.csv')
         self.save(self.validset, f'{self.catname}_valid.csv')
         self.save(self.testset , f'{self.catname}_test.csv')
-        
         return self.trainset, self.validset, self.testset
-
+        
     def _split_catalogue_grouping(self, y_colname, groups_colname, test_size=0.1): #y: cancer_type, GEO: group_id , TCGA: patient_id
         # Initial split for train and temp (temp will later be split into validation and test)
         gss = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=42)  # 70% train, 30% temp

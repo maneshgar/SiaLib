@@ -5,8 +5,9 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 class DepMap(Data):
-    def __init__(self, catalogue=None, root=None, embed_name=None, augment=False):
-        super().__init__("DepMap", catalogue=catalogue, root=root, embed_name=embed_name, augment=augment)
+    def __init__(self, catalogue=None, root=None, embed_name=None, cancer_types=None, augment=False):
+        self.grouping_col = "sample_id"
+        super().__init__("DepMap", catalogue=catalogue, root=root, embed_name=embed_name, cancer_types=cancer_types, augment=augment)
 
     # filter dep file to only include genes of interest
     def dep_gene(self, dep, genes_use):
@@ -186,7 +187,7 @@ class DepMap(Data):
             'sample_id': exp_sid_list,
             'gene_name': fp_gid_list,
             'dep_prob': dep_prob,
-            'exp_filename': exp_fnm_list,
+            'filename': exp_fnm_list,
             'fp_filename': fp_fnm_list
         })
         self.save(data=self.catalogue, rel_path='catalogue.csv')

@@ -9,6 +9,15 @@ from lifelines.statistics import logrank_test
 from scipy.stats import pearsonr, spearmanr
 from .futils import create_directories
 import jax.numpy as jnp
+from matplotlib.lines import Line2D
+
+def cccr(true_prop, pred_prop):
+    mean_true = np.mean(true_prop)
+    mean_pred = np.mean(pred_prop)
+    var_true = np.var(true_prop)
+    var_pred = np.var(pred_prop)
+    covariance = np.mean((true_prop - mean_true) * (pred_prop - mean_pred))
+    return (2 * covariance) / (var_true + var_pred + (mean_true - mean_pred)**2)
 
 class Classification: 
 
@@ -205,7 +214,14 @@ class TMEDeconv:
     def __init__(self):
         self.true_prop = [[]]
         self.pred_prop = [[]]
+        self.cell_type_rmse = [[]]
         self.cell_type_pcc = [[]]
+        self.cell_type_scc = [[]]
+        self.cell_type_ccc = [[]]
+        self.sample_rmse = [[]]
+        self.sample_pcc = [[]]
+        self.sample_scc = [[]]
+        self.sample_ccc = [[]]
     
     def add_data(self, true_p, pred_p): 
         true_p = np.array(true_p)  
@@ -222,22 +238,87 @@ class TMEDeconv:
 
     def update_metrics(self):
         true_prop = np.array(self.true_prop)
-        print(true_prop.shape)
         pred_prop = np.array(self.pred_prop)
-        print(pred_prop.shape)
 
         squared_error = (pred_prop - true_prop) ** 2
-        sample_rmse = np.sqrt(np.mean(squared_error, axis=-1))  
-        self.rmse = np.mean(sample_rmse)
-        self.cell_type_pcc = [pearsonr(true_prop[:, i], pred_prop[:, i])[0] for i in range(true_prop.shape[1])]
-        self.pcc = np.mean(self.cell_type_pcc)
-        self.report = f"RMSE: {self.rmse}\nPCC: {self.pcc}"
 
-    def cell_type_pcc_plot(self):
+        # cell type level 
+        n_celltypes = true_prop.shape[1]
+        self.cell_type_rmse = np.sqrt(np.mean(squared_error, axis=0))  
+
+        self.cell_type_pcc = []
+        self.cell_type_scc = []
+        self.cell_type_ccc = []
+
+        for i in range(n_celltypes):
+            t = true_prop[:, i]
+            p = pred_prop[:, i]
+
+            # detect constant inputs
+            is_t_const = np.all(t == t[0])
+            is_p_const = np.all(p == p[0])
+            if is_t_const or is_p_const:
+                which = []
+                if is_t_const: which.append("true_prop")
+                if is_p_const: which.append("pred_prop")
+                print(f"[Warning] column {i} constant in: {', '.join(which)}")
+
+            pcc_val = pearsonr(t, p)[0] if not (is_t_const or is_p_const) else np.nan
+            scc_val = spearmanr(t, p)[0] if not (is_t_const or is_p_const) else np.nan
+            ccc_val = cccr(t, p) if not (is_t_const or is_p_const) else np.nan
+
+            self.cell_type_pcc.append(pcc_val)
+            self.cell_type_scc.append(scc_val)
+            self.cell_type_ccc.append(ccc_val)
+
+        self.ct_rmse = np.mean(self.cell_type_rmse)
+        self.ct_pcc = np.nanmean(self.cell_type_pcc)
+        self.ct_scc = np.nanmean(self.cell_type_scc)
+        self.ct_ccc = np.nanmean(self.cell_type_ccc)
+
+        # sample level
+        n_samples = true_prop.shape[0]
+        self.sample_rmse = np.zeros(n_samples)
+        self.sample_pcc  = np.zeros(n_samples)
+        self.sample_scc  = np.zeros(n_samples)
+        self.sample_ccc  = np.zeros(n_samples)
+
+        for i in range(n_samples):
+            t_i = true_prop[i, :]   
+            p_i = pred_prop[i, :]
+
+            self.sample_rmse[i] = np.sqrt(np.mean((p_i - t_i) ** 2))
+
+            is_t_const = np.all(t_i == t_i[0])
+            is_p_const = np.all(p_i == p_i[0])
+            self.sample_pcc[i] = pearsonr(t_i, p_i)[0] if not (is_t_const or is_p_const) else np.nan
+            self.sample_scc[i] = spearmanr(t_i, p_i)[0] if not (is_t_const or is_p_const) else np.nan
+            self.sample_ccc[i] = cccr(t_i, p_i) if not (is_t_const or is_p_const) else np.nan
+
+        self.mean_sample_rmse = np.nanmean(self.sample_rmse)
+        self.mean_sample_pcc  = np.nanmean(self.sample_pcc)
+        self.mean_sample_scc  = np.nanmean(self.sample_scc)
+        self.mean_sample_ccc  = np.nanmean(self.sample_ccc)
+
+        self.report = (
+            f"Cell-type metrics:\n"
+            f"  RMSE (avg over cell types): {self.ct_rmse:.4f}\n"
+            f"  PCC (avg over cell types): {self.ct_pcc:.4f}\n"
+            f"  SCC (avg over cell types): {self.ct_scc:.4f}\n"
+            f"  CCC (avg over cell types): {self.ct_ccc:.4f}\n\n"
+            f"Sample-level metrics (avg over samples):\n"
+            f"  RMSE (avg over samples): {self.mean_sample_rmse:.4f}\n"
+            f"  PCC (avg over samples): {self.mean_sample_pcc:.4f}\n"
+            f"  SCC (avg over samples): {self.mean_sample_scc:.4f}\n"
+            f"  CCC (avg over samples): {self.mean_sample_ccc:.4f}"
+        )
+
+    def cell_type_scatter_plot(self):
         num_cell_types = self.true_prop.shape[1]
         fig, axes = plt.subplots(nrows=1, ncols=num_cell_types, figsize=(5 * num_cell_types, 5))
-
-        cell_types = ['B cell', 'CD4+ T cell', 'CD8+ T cell', 'NK cell', 'Neutrophil', 'Monocyte', 'Fibroblast', 'Endothelial cell', 'Others']
+        # cell_types = ['B cell', 'CD4+ T cell', 'CD8+ T cell', 'T cell (others)', 'NK cell', 'Granulocyte', 'Monocytic', 'Fibroblast', 'Endothelial cell', 'Others']
+        # cell_types = ['B cell', 'CD4+ T cell', 'CD8+ T cell', 'NK cell', 'Neutrophil', 'Monocytic', 'Fibroblast', 'Endothelial cell', 'Others']
+        cell_types = ['B cell', 'CD4+ T cell', 'CD8+ T cell', 'NK cell', 'Granulocyte', 'Monocytic', 'Fibroblast', 'Endothelial cell', 'Others']
 
         if num_cell_types == 1:
             axes = [axes]
@@ -246,19 +327,45 @@ class TMEDeconv:
             x = self.true_prop[:, i]
             y = self.pred_prop[:, i]
 
-            pcc, _ = pearsonr(x, y)
+            rmse_ct = self.cell_type_rmse[i]
+            pcc_val = self.cell_type_pcc[i]
+            scc_val = self.cell_type_scc[i]
+            ccc_val = self.cell_type_ccc[i]
 
-            ax.scatter(x, y, alpha=0.6)
+            invalid = (np.any(np.isnan(x)) or np.any(np.isnan(y)) or np.std(x) == 0 or np.std(y) == 0) #const pred or true
 
-            slope, intercept = np.polyfit(x, y, 1)
-            ax.plot(x, slope * x + intercept, color="blue")
+            if not invalid:
+                ax.scatter(x, y, alpha=0.6)
+                slope, intercept = np.polyfit(x, y, 1)
+                ax.plot(x, slope * x + intercept, color="blue")
+            else:
+                ax.text(0.5, 0.5, "Invalid input", ha='center', va='center', transform=ax.transAxes)
+
             ax.set_xlabel("True Proportion")
             ax.set_ylabel("Predicted Proportion")
-            ax.set_title(f"{cell_types[i]} (PCC: {pcc:.2f})")
-            # ax.legend()
+            ax.set_title(f"{cell_types[i]}")
+
+            handles = [
+                Line2D([], [], linestyle="none", label=f"PCC: {np.nan_to_num(pcc_val):.2f}"),
+                Line2D([], [], linestyle="none", label=f"SCC: {np.nan_to_num(scc_val):.2f}"),
+                Line2D([], [], linestyle="none", label=f"CCC: {np.nan_to_num(ccc_val):.2f}"),
+                Line2D([], [], linestyle="none", label=f"RMSE: {rmse_ct:.2f}")
+            ]
+            legend = ax.legend(
+                handles=handles,
+                loc="upper right",
+                frameon=True,             # draw the box
+                framealpha=0.7,           # semi‐transparent
+                edgecolor="black",
+                fontsize="small",
+                handlelength=1.0,    # shorten the little marker‐line on the left
+                handletextpad=0.4,   # reduce space between the marker and the text
+                labelspacing=1.0     # keep vertical spacing roughly at default
+            )
+            legend.get_frame().set_facecolor("white")
 
         plt.tight_layout()
-        plt.savefig("cell_type_pcc.png")
+        plt.savefig("cell_type_scatter.png")
         plt.close()
 
     def pcc_boxplot(self):
@@ -269,12 +376,30 @@ class TMEDeconv:
         plt.savefig("pcc_boxplot.png")
         plt.close()
 
+    def save_results(self, out_dir, model_name, cell_type_names: list[str]):
+        np.savez(
+            os.path.join(out_dir, "eval_res.npz"),
+            model_name=model_name.split("_", 1)[1],
+            true_prop=self.true_prop,
+            pred_prop=self.pred_prop,
+            cell_type_names=np.array(cell_type_names, dtype="U"),
+        )
+
 class GeneEssentiality:
     def __init__(self):
         self.true_prob = [[]]
         self.pred_prob = [[]]
-        self.scc = [[]]
         self.fingerprint = []
+
+        self.mse = None
+        self.pcc = None
+        self.scc = None
+        self.ccc = None
+
+        self.perDep_scc = None
+        self.perDep_pcc = None
+        self.perDep_mse = None
+        self.perDep_ccc = None
     
     def add_data(self, true_p, pred_p, fingerprint): 
         true_p = np.array(true_p)  
@@ -308,24 +433,52 @@ class GeneEssentiality:
         squared_error = (pred_prob - true_prob) ** 2 
         self.mse = np.mean(squared_error)
         self.scc = spearmanr(self.true_prob, self.pred_prob)[0]
+        self.pcc = pearsonr(self.true_prob.ravel(), self.pred_prob.ravel())[0]
+        self.ccc = cccr(self.true_prob, self.pred_prob)
         
         # per-DepOI
         unique_genes = np.unique(self.fingerprint)
-        gene_corrs = []
+        gene_sccs = []
+        gene_pccs = []
+        gene_mses = []
+        gene_cccs = []
+
         for gene in unique_genes:
             indices = [i for i, g in enumerate(self.fingerprint) if g == gene]
             indices_arr = jnp.array(indices)
             true_vector = true_prob[indices_arr, :].flatten()
             pred_vector = pred_prob[indices_arr, :].flatten()
+
+            mse_val = float(np.mean((np.array(pred_vector) - np.array(true_vector)) ** 2))
+            gene_mses.append(mse_val)
+
             if np.std(true_vector) != 0 and np.std(pred_vector) != 0:
-                r, _ = spearmanr(true_vector, pred_vector)
+                scc_val = spearmanr(np.array(true_vector), np.array(pred_vector))[0]
+                pcc_val = pearsonr(np.array(true_vector), np.array(pred_vector))[0]
+                ccc_val = cccr(np.array(true_vector), np.array(pred_vector))
             else:
-                r = np.nan
-            # r, _ = spearmanr(true_vector, pred_vector)
-            gene_corrs.append(r)
+                scc_val = np.nan
+                pcc_val = np.nan
+                ccc_val = np.nan
+            
+            gene_sccs.append(scc_val)
+            gene_pccs.append(pcc_val)
+            gene_cccs.append(ccc_val)
 
-        self.perDep_scc = np.nanmean(gene_corrs)
+        self.perDep_scc = float(np.nanmean(gene_sccs))
+        self.perDep_pcc = float(np.nanmean(gene_pccs))
+        self.perDep_mse = float(np.nanmean(gene_mses))
+        self.perDep_ccc = float(np.nanmean(gene_cccs))
 
-        self.report = f"MSE: {self.mse}\nSCC: {self.scc}\nper-DepOI: {self.perDep_scc}"
+        self.report = (
+            f"SCC: {self.scc:.4f}\n"
+            f"PCC: {self.pcc:.4f}\n"
+            f"MSE: {self.mse:.4f}\n"
+            f"CCC: {self.ccc:.4f}\n"
+            f"per-DepOI SCC: {self.perDep_scc:.4f}\n"
+            f"per-DepOI PCC: {self.perDep_pcc:.4f}\n"
+            f"per-DepOI MSE: {self.perDep_mse:.4f}\n"
+            f"per-DepOI CCC: {self.perDep_ccc:.4f}"
+        )
 
     

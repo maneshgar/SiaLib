@@ -5,18 +5,26 @@ from glob import glob
 from . import Data
 from tqdm import tqdm
 
+warnings.filterwarnings("ignore", category=DtypeWarning)
 class TME(Data):
-    def __init__(self, dataset_name, catalogue=None, catname="catalogue", root=None, classes=None, embed_name=None, singleCell=False, celltype_mapping=None, augment=False):
+    def __init__(self, dataset_name, catalogue=None, catname="catalogue", root=None, classes=None, cancer_types=None, embed_name=None, singleCell=False, celltype_mapping=None, augment=False):
         
-        super().__init__("TME", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, augment=augment)
+        name = "".join(["TME", f"/{dataset_name}"])
+
+        super().__init__(name, catalogue=catalogue, catname=catname, root=root, cancer_types=cancer_types, embed_name=embed_name, augment=augment)
 
         self.dataset_name = dataset_name  # e.g., "SDY67"
         self.grouping_col = "sample_id"
 
         self.singleCell = singleCell
 
+        # self.classes = [
+        #     "B", "CD4T", "CD8T", "Tothers", "NK", "granulocytes",
+        #     "monocytic", "fibroblasts", "endothelial", "others"
+        # ]
+
         self.classes = [
-            "B", "CD4T", "CD8T", "Tothers", "NK", "granulocytes",
+            "B", "CD4T", "CD8T", "NK", "granulocytes",
             "monocytic", "fibroblasts", "endothelial", "others"
         ]
 
@@ -28,7 +36,7 @@ class TME(Data):
         self.geoID_map = filtered.drop_duplicates(subset="GeneID").set_index("GeneID")["EnsemblGeneID"]
 
         self.celltype_mapping=celltype_mapping
-        self.base = os.path.join(self.root, self.dataset_name)
+        # self.base = os.path.join(self.root, self.dataset_name)
 
     def tpm(self, expression):
         path = "/projects/ovcare/users/tina_zhang/data/immune_deconv/Human.GRCh38.p13.annot.tsv"
@@ -39,7 +47,7 @@ class TME(Data):
         gene_lengths_series = pd.Series(gene_lengths).reindex(gene_columns)
         valid_genes = gene_lengths_series.dropna().index.tolist()
 
-        rpk = expression[valid_genes].div(gene_lengths_series[valid_genes], axis=1)
+        rpk = expression[valid_genes].div(gene_lengths_series[valid_genes], axis=1) * 1e3
         scaling_factors = rpk.sum(axis=1)
         tpm = rpk.div(scaling_factors, axis=0) * 1e6
 
@@ -90,7 +98,7 @@ class TME(Data):
         return meta_align
     
     def _split_exp(self, exp_matrix):
-        output_dir = os.path.join(self.base, "data")
+        output_dir = os.path.join(self.root, "data")
         print(output_dir)
         os.makedirs(output_dir, exist_ok=True)  
 
@@ -108,21 +116,19 @@ class TME(Data):
     def _gen_catalogue(self, ext=".pkl", singleCell=False):
         
         if singleCell:
-            meta_path = os.path.join(self.base, f"{self.dataset_name}_proportions.csv")
+            meta_path = os.path.join(self.root, f"{self.dataset_name}_proportions.csv")
             metadata_alignCT = pd.read_csv(meta_path)
         else:
             meta_result = self._process_meta()
             if isinstance(meta_result, pd.DataFrame):
                 metadata_alignCT = self._convert_class(meta_result)
-                n_dfs = 1
             elif isinstance(meta_result, (list, tuple)):
-                n_dfs = len(meta_result)
                 converted = [self._convert_class(df) for df in meta_result]
                 metadata_alignCT = pd.concat(converted, ignore_index=True)
             else:
                 raise ValueError("Unexpected output from _process_meta")
 
-        filesnames = glob(os.path.join(self.root, self.dataset_name, "**/*" + ext), recursive=True)
+        filesnames = glob(os.path.join(self.root, "data", "**/*" + ext), recursive=True)
         fnm_list = [file.split(f"/{self.dataset_name}/")[1] for file in filesnames]
 
         file_map = {os.path.splitext(os.path.basename(f))[0]: f for f in fnm_list}
@@ -139,6 +145,7 @@ class TME(Data):
             'B_prop': metadata_alignCT["B"],
             'CD4_prop': metadata_alignCT["CD4T"],
             'CD8_prop': metadata_alignCT["CD8T"],
+            # 'Tothers_prop': metadata_alignCT["Tothers"],
             'NK_prop': metadata_alignCT["NK"],
             'granulocyte_prop': metadata_alignCT["granulocytes"],
             'monocytic_prop': metadata_alignCT["monocytic"],
@@ -148,11 +155,11 @@ class TME(Data):
             'filename': metadata_alignCT["filename"]
         })
 
-        self.save(data=self.catalogue, rel_path=os.path.join(self.dataset_name, f"{self.catname}.csv"))
+        self.save(data=self.catalogue, rel_path=os.path.join("300_nosparse",f"{self.catname}.csv"))
         return self.catalogue
 
 class SDY67(TME):
-    def __init__(self, root=None, catalogue=None, catname="catalogue_sdy67", embed_name=None, singleCell=False, augment=False):
+    def __init__(self, root=None, catalogue=None, catname="catalogue_sdy67", cancer_types=None, embed_name=None, singleCell=False, augment=False):
         celltype_mapping = {
             "B": ["B Naive", "B Ex", "B NSM", "B SM", "Plasmablasts"],
             "CD4T": ["T CD4"],
@@ -161,11 +168,12 @@ class SDY67(TME):
             "monocytic": ["mDCs", "pDCs", "Monocytes C", "Monocytes I", "Monocytes NC"],
             "NK": ["NK"]
         }
-        super().__init__(dataset_name="SDY67", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
+
+        super().__init__(dataset_name="SDY67", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, cancer_types=cancer_types, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
 
     def process_expression(self):
-        exp1 = pd.read_csv(f"{self.base}/SDY67_EXP13377_RNA_seq.703318.tsv", sep="\t")
-        exp2 = pd.read_csv(f"{self.base}/SDY67_EXP14625_RNA_seq.703317.tsv", sep="\t")
+        exp1 = pd.read_csv(f"{self.root}/SDY67_EXP13377_RNA_seq.703318.tsv", sep="\t")
+        exp2 = pd.read_csv(f"{self.root}/SDY67_EXP14625_RNA_seq.703317.tsv", sep="\t")
         exp_combined = pd.merge(exp1, exp2, on="GENE_SYMBOL", how="inner")
         exp_combined["GENE_ID"] = exp_combined["GENE_SYMBOL"].map(self.geneID_map)
         exp_combined = exp_combined.dropna(subset=["GENE_ID"])
@@ -178,7 +186,7 @@ class SDY67(TME):
         return
 
     def _process_meta(self):
-        gene_exp_meta = pd.read_csv(f"{self.base}/gene_exp_metadata_combined.csv")
+        gene_exp_meta = pd.read_csv(f"{self.root}/gene_exp_metadata_combined.csv")
         gene_exp_meta["subject_id"] = (
             gene_exp_meta["Subject Accession"].astype(str) + "_" +
             gene_exp_meta["Study Time Collected"].astype(str)
@@ -195,22 +203,22 @@ class SDY67(TME):
         return merged_meta
 
 class GSE107011(TME):
-    def __init__(self, root=None, catalogue=None, catname="catalogue_gse107011", embed_name=None, singleCell=False, augment=False):
+    def __init__(self, root=None, catalogue=None, catname="catalogue_gse107011", cancer_types=None, embed_name=None, singleCell=False, augment=False):
         celltype_mapping = {
             "B": ["B Naive", "B Ex", "B NSM", "B SM", "Plasmablasts"],
             "CD4T": ["T CD4 Naive", "T CD4 TE", "Tregs", "Tfh", "Th1", "Th1/Th17", "Th17", "Th2"],
             "CD8T": ["T CD8 Naive", "T CD8 CM", "T CD8 EM", "T CD8 TE"],
-            "Tothers": ["T gd non-Vd2", "T gd Vd2", "MAIT"],
+            # "Tothers": ["T gd non-Vd2", "T gd Vd2", "MAIT"],
             "granulocytes": ["Basophils LD", "'Neutrophils LD"],
             "monocytic": ["mDCs", "pDCs", "Monocytes C", "Monocytes I", "Monocytes NC"],
             "NK": ["NK"],
-            "others": ["Progenitors"]
+            "others": ["Progenitors", "T gd non-Vd2", "T gd Vd2", "MAIT"]
         }
-        super().__init__(dataset_name="GSE107011", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
+        super().__init__(dataset_name="GSE107011", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, cancer_types=None, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
 
     def process_expression(self):
         # Get Sample Name, GSM mapping:
-        with open(f"{self.base}/GSE107011_series_matrix.txt", "r") as f:
+        with open(f"{self.root}/GSE107011_series_matrix.txt", "r") as f:
             lines = f.readlines()
 
         sample_id_line = next(line for line in lines if line.startswith("!Series_sample_id"))
@@ -236,7 +244,7 @@ class GSE107011(TME):
         gsm_to_sample_name = dict(zip(meta_labels["series_sample_id"], meta_labels["Sample Name"]))
 
         # Map Ensembl ID
-        exp = pd.read_csv(f"{self.base}/GSE107011_norm_counts_TPM_GRCh38.p13_NCBI.tsv", sep = "\t")
+        exp = pd.read_csv(f"{self.root}/GSE107011_norm_counts_TPM_GRCh38.p13_NCBI.tsv", sep = "\t")
         exp["GENE_ID"] = exp["GeneID"].map(self.geoID_map)
         exp = exp.dropna(subset=["GENE_ID"])
         exp = exp.drop(columns=["GeneID"])
@@ -259,7 +267,7 @@ class GSE107011(TME):
         return
 
     def _process_meta(self):
-        gene_exp_meta = pd.read_csv(f"{self.base}/GSE107011_labels.csv")
+        gene_exp_meta = pd.read_csv(f"{self.root}/GSE107011_labels.csv")
         meta = gene_exp_meta.rename(columns={"Sample Name": "sample_id"})
         numeric_cols = meta.select_dtypes(include='number').columns
         meta[numeric_cols] = meta[numeric_cols] / 100
@@ -267,23 +275,23 @@ class GSE107011(TME):
         return meta
 
 class Com(TME):
-    def __init__(self, root=None, catalogue=None, catname="catalogue_com", embed_name=None, singleCell=False, augment=False):
+    def __init__(self, root=None, catalogue=None, catname="catalogue_com", cancer_types=None, embed_name=None, singleCell=False, augment=False):
         celltype_mapping = {
             "B": ["naive.B.cells", "memory.B.cells", "B.cells"],
             "CD4T": ["memory.CD4.T.cells", "naive.CD4.T.cells", "regulatory.T.cells", "CD4.T.cells"],
             "CD8T": ["memory.CD8.T.cells", "naive.CD8.T.cells", "CD8.T.cells"],
             "monocytic": ["myeloid.dendritic.cells", "macrophages", "monocytes", "monocytic.lineage"],
-            "granulocyte": ["neutrophils"],
+            "granulocytes": ["neutrophils"],
             "NK": ["NK.cells"],
             "endothelial": ["endothelial.cells"],
             "fibroblasts": ["fibroblasts"]
         }
 
-        super().__init__(dataset_name="Com", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
+        super().__init__(dataset_name="Com", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, cancer_types=cancer_types, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
 
     def process_expression(self, invitro=False, wu=False):
         if wu:
-            wu_exp = pd.read_csv(f"{self.base}/og_data/wu-coarse-ensg-raw-expr-challenge-cells.csv")
+            wu_exp = pd.read_csv(f"{self.root}/og_data/wu-coarse-ensg-raw-expr-challenge-cells.csv")
             wu_exp.set_index('Gene', inplace=True)
             wu_exp = wu_exp.T
             wu_exp = wu_exp.reset_index().rename(columns={wu_exp.index.name or "index": "sample_id"})
@@ -292,7 +300,7 @@ class Com(TME):
             exp_tpm = self.tpm(wu_exp)
             
         elif invitro:
-            invitro_exp = pd.read_csv(f"{self.base}/og_data/GEO_ensg_tpm.csv")
+            invitro_exp = pd.read_csv(f"{self.root}/og_data/GEO_ensg_tpm.csv")
             cols = [invitro_exp.columns[0]] + [col for col in invitro_exp.columns if col.startswith("BM") or col.startswith("RM")]
             invitro_exp = invitro_exp[cols]
 
@@ -307,7 +315,7 @@ class Com(TME):
 
             all_expression = pd.DataFrame()
             for study in studies:
-                curr_exp = pd.read_csv(f"{self.base}/og_data/{study}_ensg_val_tpm.csv")
+                curr_exp = pd.read_csv(f"{self.root}/og_data/{study}_ensg_val_tpm.csv")
                 original_columns = curr_exp.columns.tolist()
                 curr_exp.columns = [original_columns[0]] + [f"{study}_{col}" for col in original_columns[1:]]
 
@@ -341,45 +349,45 @@ class Com(TME):
         return labels_prop
     
     def _process_meta(self):
-        insilico_labels_coarse = pd.read_excel(f"{self.base}/Admixture_Proportions.xlsx", sheet_name="InSilico Coarse")
+        insilico_labels_coarse = pd.read_excel(f"{self.root}/Admixture_Proportions.xlsx", sheet_name="InSilico Coarse")
         insilico_labels_coarse["sample_id"] = insilico_labels_coarse["dataset.name"] + "_" + insilico_labels_coarse["sample.id"].astype(str)
         insilico_prop_coarse = self._extract_labels_com(insilico_labels_coarse)
 
-        insilico_labels_fine = pd.read_excel(f"{self.base}/Admixture_Proportions.xlsx", sheet_name="InSilicoFine")
+        insilico_labels_fine = pd.read_excel(f"{self.root}/Admixture_Proportions.xlsx", sheet_name="InSilicoFine")
         insilico_labels_fine["sample_id"] = insilico_labels_fine["dataset.name"] + "_" + insilico_labels_fine["sample.id"].astype(str)
         insilico_prop_fine = self._extract_labels_com(insilico_labels_fine)
 
-        wu_labels_fine = pd.read_excel(f"{self.base}/Admixture_Proportions.xlsx", sheet_name="Wu Fine")
+        wu_labels_fine = pd.read_excel(f"{self.root}/Admixture_Proportions.xlsx", sheet_name="Wu Fine")
         wu_labels_fine.rename(columns={"sample.id": "sample_id"}, inplace=True)
         wu_prop_fine = self._extract_labels_com(wu_labels_fine)
 
-        invitro_labels = pd.read_excel(f"{self.base}/Admixture_Proportions.xlsx", sheet_name="InVitroCoarse")
+        invitro_labels = pd.read_excel(f"{self.root}/Admixture_Proportions.xlsx", sheet_name="InVitroCoarse")
         invitro_labels.rename(columns={"sample.id": "sample_id"}, inplace=True)
         invitro_prop = self._extract_labels_com(invitro_labels)
         
         return insilico_prop_coarse, insilico_prop_fine, invitro_prop, wu_prop_fine
 
 class Liu(TME):
-    def __init__(self, root=None, catalogue=None, catname="catalogue_liu", embed_name=None, singleCell=True, augment=False):
+    def __init__(self, root=None, catalogue=None, catname="catalogue_liu", cancer_types=None, embed_name=None, singleCell=True, augment=False):
         celltype_mapping = {
             "B": ["B cell", "plasma cell"],
             "CD4T": ["CD4_exhausted", "Tregs"],
             "CD8T": ["CD8_exhausted", "cytotoxic"],
-            "Tothers": ["naive", "unassigned", "proliferating"],
+            # "Tothers": ["naive", "unassigned", "proliferating"],
             "granulocytes": ["granulocyte"],
             "monocytic": ["pDC", "myeloid"],
             "NK": ["NK", "NK_activated"],
             "endothelial": ["endothelial"],
             "fibroblasts": ["fibroblast"],
-            "others": ["epithelial"]
+            "others": ["epithelial", "naive", "unassigned", "proliferating"]
         }
 
         
-        super().__init__(dataset_name="Liu", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
+        super().__init__(dataset_name="Liu", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, cancer_types=cancer_types, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
         self.patient_ids = ["TBB011", "TBB035", "TBB075", "TBB102", "TBB111", "TBB129", "TBB165", "TBB171", "TBB184", "TBB212", "TBB214", "TBB226", "TBB330", "TBB338"]
-
+        
     def process_ct(self, patient_id):
-        meta_path = os.path.join(self.base, "og_data", f"{patient_id}_complete_singlecell_metadata.txt")
+        meta_path = os.path.join(self.root, "og_data", f"{patient_id}_complete_singlecell_metadata.txt")
         meta = pd.read_csv(meta_path, sep = "\t")
         meta["overall_ct"] = np.where(meta["cell_type"] == "T/NK cell", meta["Tcell_metacluster"], meta["cell_type"]) # use Tcell_metacluster for fine NK/T cell labels when general cell type is T/NKcell
         meta["cellID"] = meta["cellID"].str.split("_", n=1).str[1] # remove sample_ID prefix from cellID
@@ -388,7 +396,7 @@ class Liu(TME):
         return metadata_alignCT
     
     def process_sc_expression(self, patient_id):
-        exp_path = os.path.join(self.base, "og_data", f"{patient_id}_singlecell_count_matrix.txt")
+        exp_path = os.path.join(self.root, "og_data", f"{patient_id}_singlecell_count_matrix.txt")
         exp = pd.read_csv(exp_path, sep = "\t")
         
         # remove .x after barcodes:
@@ -410,23 +418,23 @@ class Liu(TME):
         return
     
 class GSE115978(TME):
-    def __init__(self, root=None, catalogue=None, catname="catalogue_gse115978", embed_name=None, singleCell=True, augment=False):
+    def __init__(self, root=None, catalogue=None, catname="catalogue_gse115978", cancer_types=None, embed_name=None, singleCell=True, augment=False):
         celltype_mapping = {
             "B": ["B.cell"],
             "CD4T": ["T.CD4"],
             "CD8T": ["T.CD8"],
-            "Tothers": ["T.cell"],
+            # "Tothers": ["T.cell"],
             "monocytic": ["Macrophage"],
             "NK": ["NK"],
             "endothelial": ["Endo."],
             "fibroblasts": ["CAF"],
-            "others": ["Mal"]
+            "others": ["Mal", "T.cell"]
         }
 
-        super().__init__(dataset_name="GSE115978", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
+        super().__init__(dataset_name="GSE115978", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, cancer_types=None, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
         
         # get patient_ids
-        self.meta_path = f"{self.base}/GSE115978_cell.annotations.csv"
+        self.meta_path = f"{self.root}/GSE115978_cell.annotations.csv"
         cell_ann = pd.read_csv(self.meta_path)
 
         filtered = cell_ann[~cell_ann["cell.types"].str.contains(r"\?", na=False)]
@@ -447,7 +455,7 @@ class GSE115978(TME):
         return metadata_alignCT
     
     def process_sc_expression(self, patient_id):
-        exp_path = os.path.join(self.base, "GSE115978_counts.csv")
+        exp_path = os.path.join(self.root, "GSE115978_counts.csv")
         exp = pd.read_csv(exp_path)
 
         # get cells from the patient

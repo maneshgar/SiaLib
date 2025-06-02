@@ -12,7 +12,7 @@ from siamics.utils import singleCell
 class TMESim:
     def __init__(self, celltypes=None, rootdir=None, dataset_name="default", sample_record_path=None):
         self.all_celltypes = [
-            "B", "CD4T", "CD8T", "Tothers", "NK", "granulocytes",
+            "B", "CD4T", "CD8T", "NK", "granulocytes",
             "monocytic", "fibroblasts", "endothelial", "others"
         ]
         

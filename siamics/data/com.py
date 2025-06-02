@@ -3,9 +3,9 @@ import os
 from . import Data
 
 class Com(Data):
-    def __init__(self, catalogue=None, root=None, embed_name=None, augment=False, meta_modes=[]):
-        super().__init__("Com", catalogue=catalogue, root="/projects/ovcare/users/tina_zhang/data/immune_deconv/", embed_name=embed_name, augment=augment, meta_modes=meta_modes)
-
+    def __init__(self, catalogue=None, root=None, embed_name=None, cancer_types=None, augment=False):
+        super().__init__("Com", catalogue=catalogue, root="/projects/ovcare/users/tina_zhang/data/immune_deconv/", embed_name=embed_name, cancer_types=cancer_types, augment=augment)
+        self.grouping_col = "sample_id"
         self.classes = [
             "B_prop", "CD4_prop", "CD8_prop", "NK_prop", "neutrophil_prop",
             "monocytic_prop", "fibroblasts_prop", "endothelial_prop", "others_prop"
@@ -157,12 +157,12 @@ class Com(Data):
     def get_nb_classes(self):
         return self.nb_classes
     
-    def get_embed_fname(self, path, fm_config_name=None):
-        if self.embed_name:
-            model_name = self.embed_name
-        else: 
-            model_name = fm_config_name
+    # def get_embed_fname(self, path, fm_config_name=None):
+    #     if self.embed_name:
+    #         model_name = self.embed_name
+    #     else: 
+    #         model_name = fm_config_name
 
-        return f'/projects/ovcare/users/tina_zhang/data/immune_deconv/Com/features/{model_name}/{os.path.basename(path)[:-3]}pkl'
+    #     return f'/projects/ovcare/users/tina_zhang/data/immune_deconv/Com/features/{model_name}/{os.path.basename(path)[:-3]}pkl'
     
     

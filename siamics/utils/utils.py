@@ -12,12 +12,23 @@ def get_label_index(labels_list):
     label_index = [map_dict[lbl] for lbl in labels_list]
     return label_index, types_unique
 
+def class_colour(type="cancer_type"):
+    values = {
+        "cancer_type": ['ACC', 'BLCA', 'BRCA', 'CESC', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 'HNSC', 'KICH', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD',
+        'LUSC', 'MESO', 'OVARIAN', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS', 'UVM'],
+        "subtype": ["Basal", "CMS2", "LuminalA", "CMS4", "LuminalB", "CMS3", "Classical", "HER2", "Normal", "CMS1", "Luminal"],
+        "dataset": ["test", "TCGA", "GEO"],
+        "centre": ["test_1", "1", "test_2",  "7", "test_3", "13", "test_4", "31", "test_5"]
+    }
+
+    return values.get(type, [])
+
 def plot_umap(
     data=None, 
     labels=None, 
-    label_name_mapping=None, 
-    application=None,
-    n_classes=None,
+    # label_name_mapping=None, 
+    label_type=None,
+    # n_classes=None,
     umap_embedding=None,
     n_neighbors=15, 
     n_components=2, 
@@ -49,50 +60,66 @@ def plot_umap(
     """
     if umap_embedding is None:
         # Step 1: Create and fit the UMAP model
-        umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components, metric=metric, **kwargs)
+        umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components, metric=metric, random_state=42, **kwargs)
         umap_embedding = umap_model.fit_transform(data)
 
     # Step 2: Create the plot
     plt.figure(figsize=(8, 6))
-    scatter_args = {'s': 8, 'alpha': transparency}  #increased transparency of dots
+    scatter_args = {'s': 8, 'alpha': transparency, 'edgecolors': 'none'}  #increased transparency of dots
     plt.title('UMAP Projection')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid(True)
 
-    if labels:
-        # Map labels to class names if mapping is provided
-        # unique_labels = sorted(set(labels))  # integers like 0, 1, 2, ..., 49
+    combined_palette = (
+        list(plt.cm.get_cmap('tab20').colors) +
+        list(plt.cm.get_cmap('tab20b').colors) +
+        list(plt.cm.get_cmap('tab20c').colors) +
+        list(plt.cm.get_cmap('Dark2').colors) +
+        list(plt.cm.get_cmap('Pastel1').colors) +
+        list(plt.cm.get_cmap('Pastel2').colors)
+    )
 
-        if application == "source":
-            # Hardcoded mapping
-            label_name_mapping = {
-                0: "GEO",
-                1: "TCGA"
-            }
-            # 'GEO' -> 0
-            name_to_index_mapping = {v: k for k, v in label_name_mapping.items()}
-            try:
-                labels = [name_to_index_mapping[label] for label in labels]
-            except KeyError as e:
-                raise ValueError(f"Unknown label {e} in source labels!")
+    if labels is not None:
+        # catch NaNs in labels
+        orig_labels = []
+        saw_nan = False
+        for l in labels:
+            if l is None or (isinstance(l, float) and np.isnan(l)):
+                orig_labels.append("nan")
+                saw_nan = True
+            else:
+                orig_labels.append(str(l))
 
-        # Step 2: Prepare colors
-        unique_labels = sorted(set(labels))
+        unique_labels = set(orig_labels)
 
-        # Generate color map for integer indices
-        cmap = plt.cm.get_cmap('nipy_spectral', n_classes)
-        index_to_color = {i: cmap(i) for i in range(n_classes)}
-        colors = [index_to_color[label] for label in labels]
+        full_list = class_colour(label_type) or [] # get persis ind
 
-        if label_name_mapping is not None:
-            try:
-                display_names = {i: label_name_mapping[i] for i in unique_labels}
-            except Exception as e:
-                raise ValueError(f"Error mapping labels with `label_name_mapping`: {e}")
+        if label_type == "cluster": # numerical order for cluster
+            numeric_labels = [lbl for lbl in unique_labels if lbl != "nan"]
+            full_list = sorted(numeric_labels, key=lambda x: int(x))
         else:
-            display_names = {i: str(i) for i in unique_labels}
+            # append labels not found in defined labels
+            for lbl in sorted(unique_labels):
+                if lbl != "nan" and lbl not in full_list:
+                    full_list.append(lbl)
 
+        n_full = len(full_list)
+        if n_full <= len(combined_palette):
+            palette = combined_palette[:n_full]
+        else:
+            fallback = plt.cm.get_cmap('tab20', n_full) # use tab20 if number of classes > palette
+            palette = [fallback(i) for i in range(n_full)]
+        if saw_nan:
+            palette.append((0.8, 0.8, 0.8))
+
+        colors = [] # assign colours based on persis ind
+        for lbl in orig_labels:
+            if lbl == "nan":
+                idx = n_full # gray
+            else:
+                idx = full_list.index(lbl)
+            colors.append(palette[idx])
 
         plt.scatter(
             umap_embedding[:, 0], 
@@ -101,24 +128,44 @@ def plot_umap(
             **scatter_args
         )
         
-        handles = [Patch(color=index_to_color[label], label=display_names[label]) for label in unique_labels]
-        if application:
-            legend_title = "Centre" if application == "group_id" else application.replace("_", " ").title()
+        # legend handles:
+        handles = []
+        legend_labels = []
 
-            plt.legend(
-                handles=handles,
-                title=legend_title,
-                bbox_to_anchor=(1.05, 1),
-                loc='upper left',
-                fontsize=8,           # smaller text
-                title_fontsize=9,     # smaller title
-                markerscale=2.5,      # increase marker size relative to small dots
-                handlelength=1.2,     # shorten line length
-                handletextpad=0.4,    # space between marker and text
-                borderpad=0.3,        # space inside legend box
-                labelspacing=0.3,     # space between entries
-                frameon=False         # remove box
+        for cls in full_list:
+            if cls in unique_labels:
+                idx = full_list.index(cls)
+                handles.append(
+                    plt.Line2D([0], [0], marker='o', linestyle='', color='w', markerfacecolor=palette[idx], markersize=6)
+                )
+                legend_labels.append(str(cls))
+
+        # add nan to legend if existed
+        if saw_nan:
+            handles.append(
+                plt.Line2D([0], [0], marker='o', linestyle='', color='w', markerfacecolor=palette[n_full], markersize=6)
             )
+            legend_labels.append("nan")
+
+        # 4 col legend if more than 8 classes
+        n_items = len(legend_labels)
+        cols = 4 if n_items > 8 else 1
+        plt.legend(
+            handles,
+            legend_labels,
+            title=(label_type.replace('_', ' ') if label_type else ''),
+            bbox_to_anchor=(1.05, 1),
+            loc='upper left',
+            ncol=cols,
+            fontsize=8,           # smaller text
+            title_fontsize=9,     # smaller title
+            markerscale=1.5,      # increase marker size relative to small dots
+            handlelength=1.0,     # shorten line length
+            handletextpad=0.4,    # space between marker and text
+            borderpad=0.3,        # space inside legend box
+            labelspacing=0.3,     # space between entries
+            frameon=False         # remove box
+        )
 
     else:
         plt.scatter(umap_embedding[:, 0], umap_embedding[:, 1], **scatter_args)
