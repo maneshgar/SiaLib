@@ -436,8 +436,7 @@ class GEO_SURV(GEO):
     
 class GEO_BATCH(GEO):
     def __init__(self, catname=None, catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, cancer_types=None, root=None, augment=False):
-        self.cancer_types = cancer_types
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, cancer_types=cancer_types, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
 
     def _read_batch_metadata(self, catalogue):
         batch_file = "batch_meta.csv"
