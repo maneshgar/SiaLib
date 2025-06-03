@@ -64,17 +64,27 @@ class Caching:
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, subtypes=None, root=None, embed_name=None, augment=False):
+    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, subtypes=None, data_mode='raw', root=None, embed_name=None, augment=False):
+
         self.name = name
         self.embed_name = embed_name
         self.augment = augment
         self.catname = catname
-        self.valid_modes=['raw', 'features', 'mean_features']
-
-        self.data_mode="raw"
-        if embed_name: self.data_mode="mean_features"
         self.remove_subids = True
         self.indeces_map = None
+
+        self.valid_modes=['raw', 'features', 'mean_features']
+
+        if data_mode is None:
+            if embed_name is not None:
+                self.data_mode = 'mean_features'
+            else:
+                self.data_mode = 'raw'
+
+        elif data_mode in self.valid_modes:
+            self.data_mode = data_mode
+        else:
+            raise ValueError(f"Invalid data mode: {data_mode}. Valid modes are: {self.valid_modes}")
 
         # Wehter to use default root or given root. 
         if root: 
@@ -365,7 +375,7 @@ class Data(Dataset):
         return pd.concat(df_lists, ignore_index=True)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, sub_sampled=False, cache_data=True):
+    def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, cache_data=True):
         """
         Initialize the DataWrapper with a list of datasets.
         
@@ -383,15 +393,15 @@ class DataWrapper(Dataset):
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
         if subset == 'full':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'validset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, cancer_types=cancer_types, root=root, embed_name=embed_name) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         else:
-            raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'train', 'valid', or 'test'.")
+            raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'trainset', 'validset', or 'testset'.")
 
         # use a portion of the data only for debugging purpose.
         if sub_sampled:
