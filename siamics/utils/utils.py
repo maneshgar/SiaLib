@@ -38,6 +38,9 @@ def plot_umap(
     save_path=None, 
     return_image=False, 
     transparency=0.4,
+    figsize=(8, 6),
+    s_size=4,
+    plt_title="UMAP Projection",
     **kwargs
 ):
     """
@@ -64,9 +67,9 @@ def plot_umap(
         umap_embedding = umap_model.fit_transform(data)
 
     # Step 2: Create the plot
-    plt.figure(figsize=(8, 6))
-    scatter_args = {'s': 8, 'alpha': transparency, 'edgecolors': 'none'}  #increased transparency of dots
-    plt.title('UMAP Projection')
+    plt.figure(figsize=figsize)
+    scatter_args = {'s': s_size, 'alpha': transparency, 'edgecolors': 'none'}  #increased transparency of dots
+    plt.title(plt_title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid(True)

@@ -27,9 +27,9 @@ class Classification:
         self.preds = []
         self.titles = titles
 
-    def gen_heatmap(self, out_dir, filename="confusion_matrix.png"):
+    def gen_heatmap(self, out_dir, figsize=(8, 6), filename="confusion_matrix.png"):
         # Create the heatmap
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=figsize)
         sns.heatmap(self.cm, annot=True, fmt="d", cmap="Blues", cbar=True, xticklabels=self.titles, yticklabels=self.titles)
 
         # Label axes
