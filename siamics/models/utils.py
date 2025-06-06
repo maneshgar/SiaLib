@@ -19,12 +19,15 @@ def create_cosine_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=
 
     return schedule_fn
 
-def create_const_lr_fn(num_epochs, base_learning_rate, steps_per_epoch):
+def create_const_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=True):
     """Creates learning rate schedule."""
+    const_fn = optax.constant_schedule(value=base_learning_rate)
+    if not warmup:
+        return const_fn
+    
     total_steps = num_epochs * steps_per_epoch
     warmup_steps = total_steps // 5
     warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.001, end_value=base_learning_rate, transition_steps=warmup_steps)
-    const_fn = optax.constant_schedule(value=base_learning_rate)
     schedule_fn = optax.join_schedules(schedules=[warmup_fn, const_fn], boundaries=[warmup_steps])
     return schedule_fn
 
@@ -109,7 +112,7 @@ def initialize_optimizer(params, nb_epochs, steps_per_epoch, lr_init, scheduler_
     if scheduler_type == 'cosine':
         lr_scheduler = create_cosine_lr_fn(nb_epochs, lr_init, steps_per_epoch, warmup=warmup)
     elif scheduler_type == 'const':
-        lr_scheduler = create_const_lr_fn(nb_epochs, lr_init, steps_per_epoch)
+        lr_scheduler = create_const_lr_fn(nb_epochs, lr_init, steps_per_epoch, warmup=warmup)
     elif scheduler_type == 'linear':
         lr_scheduler = create_linear_lr_fn(nb_epochs, lr_init, steps_per_epoch)
     elif scheduler_type == 'cosineAnnealing':

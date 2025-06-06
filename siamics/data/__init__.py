@@ -7,10 +7,17 @@ from sklearn.model_selection import train_test_split, GroupShuffleSplit
 
 def remove_subids(data):
     data.columns = [item.split(".")[0] for item in data.columns]
-    data = data.T.groupby(level=0).mean().T
-    # data = data.loc[:,~data.columns.duplicated()]
+    # Cases to handle:
+    # 1. If there are duplicate columns, we can group by the first level and take the mean.
+    # 2. If one or more columns are nan, we should remove them. 
+    data = data.T.groupby(level=0).mean().T 
     return data
-    
+
+def get_common_genes_main(reference_data, target_data):
+    common_genes = reference_data.columns.intersection(target_data.columns)  # Find common genes
+    target_data = target_data[common_genes]
+    return common_genes, target_data
+
 def get_common_genes(reference_data, target_data, ignore_subids=False, keep_duplicates=False):
     if ignore_subids:
         reference_data.columns = [item.split(".")[0] for item in reference_data.columns]
@@ -26,14 +33,17 @@ def get_common_genes(reference_data, target_data, ignore_subids=False, keep_dupl
     target_data = target_data[common_genes].fillna(0) # TODO: make sure we dont cover any bug with this. 
     return common_genes, target_data
 
-def pad_dataframe(reference_data, target_data, pad_token=0):
+def pad_match_columns(reference_data, target_data, pad_value, mask):
 
     missing_cols = set(reference_data.columns) - set(target_data.columns)
     if missing_cols:
-        target_data = target_data.reindex(columns=target_data.columns.tolist() + list(missing_cols), fill_value=pad_token)
+        target_data = target_data.reindex(columns=target_data.columns.tolist() + list(missing_cols), fill_value=pad_value)
+        mask = mask.reindex(columns=mask.columns.tolist() + list(missing_cols), fill_value=True)
         
     target_data = target_data[reference_data.columns]
-    return target_data
+    mask = mask[reference_data.columns]
+
+    return target_data, mask
 
 def drop_sparse_data(catalogue, stats, nb_genes, threshold=0.5):
     zeros_thresh = threshold * nb_genes

@@ -37,7 +37,7 @@ def plot_umap(
     ylabel="Y Label", 
     save_path=None, 
     return_image=False, 
-    transparency=0.4,
+    transparency=0.8,
     figsize=(8, 6),
     s_size=4,
     plt_title="UMAP Projection",
@@ -230,7 +230,7 @@ def plot_umap(
     # Return the in-memory image if requested
     return image_buffer, umap_embedding
 
-def plot_hist(data):
+def plot_hist(data, save_path=None):
     # Plot histogram
     plt.figure(figsize=(10, 5))
     plt.hist(data, bins=66, range=(0, 65), alpha=0.75, color='b', edgecolor='black')
@@ -238,7 +238,12 @@ def plot_hist(data):
     plt.ylabel("Frequency")
     plt.title("Histogram of Binned Token Frequencies")
     plt.xticks(np.arange(0, 65, step=5))  # Adjust ticks for readability
-    plt.savefig("plt.png")
+    if not save_path:
+        save_path = "histogram.png"
+    create_directories(save_path)
+    plt.savefig(save_path, bbox_inches='tight')
+    print(f"Histogram saved to {save_path}")
+    return save_path
 
 class RunningStats:
     def __init__(self):
