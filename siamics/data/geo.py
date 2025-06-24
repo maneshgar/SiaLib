@@ -8,7 +8,7 @@ import GEOparse
 import logging
 import numpy as np
 
-from . import Data
+from . import Data, get_common_genes_main
 from . import futils
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -181,7 +181,7 @@ class GEO(Data):
             total += df.shape[1]
         return total
     
-    def _gen_catalogue(self, file_path="list_gsmfiles.pkl", experiments=[], type="exc", dname_postfix=None, sparsity=0.5, organism=["Homo sapiens"]):
+    def _gen_catalogue(self, file_path="list_gsmfiles.pkl", experiments=[], type="exc", dname_postfix=None, sparsity=0.5, genes_sample_file=None, organism=["Homo sapiens"]):
         gseid_list = [] 
         gsmid_list = [] 
         fnm_list = [] 
@@ -226,8 +226,13 @@ class GEO(Data):
                             return
                         
                     # Check if it is not sparse
-                    zeros_count = (data == 0).sum().sum()
-                    if zeros_count > (data.size * sparsity):
+                    if genes_sample_file:
+                        genes_set, data_simplified = get_common_genes_main(reference_data=genes_sample_file, target_data=data)
+                    else: 
+                        data_simplified = data
+                        
+                    zeros_count = (data_simplified == 0).sum().sum()
+                    if zeros_count > (data_simplified.size * sparsity):
                         print(f"Catalogue::Skipping {gse_id}:{gsm_id}::Sparse data with {zeros_count} zeros.")
                         return
 

@@ -3,6 +3,7 @@ from siamics.data import geo
 from siamics.utils import futils
 import logging
 from tqdm import tqdm
+import pandas as pd
 
 # Download Files
 STEP1=False 
@@ -13,9 +14,15 @@ STEP3=False
 # List all the files into another file. 
 STEP4=False
 # Generate catalogues for sub datasets 
-STEP5=True
+STEP5=False
 # generate catalgues for the pretraining big dataset. 
-STEP6=False
+STEP6=True
+# Remove sparse samples from the catalogue
+STEP7=False
+#
+STEP8=False
+# Split catalogue to Train, Valid and Test
+STEP9=False
 
 
 def download_from_website(root, xml_fname):
@@ -33,11 +40,10 @@ def convert_to_single_file_ensg_pickle(raw_root, main_root, xml_fname):
     dataset.extract_gsms(os.path.join(raw_root, xml_fname), main_root)
     print("GSM extraction is done.")
 
-def generate_catalogue(dataset, type=None, experiments=None):
-    dataset._gen_catalogue(experiments=experiments, type=type)    
+def generate_catalogue(dataset, type=None, experiments=None, sample_file=None):
+    dataset._gen_catalogue(experiments=experiments, type=type, sparsity=0.5, genes_sample_file=sample_file)
     append_organism_to_catalogue(geo.GEO())
     dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True)
-    dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping
 
 def append_organism_to_catalogue(dataset):
     # Set GEOparse logging level
@@ -83,10 +89,10 @@ def append_organism_to_catalogue(dataset):
     dataset.save(data=catalogue, rel_path=f"{dataset.catname}.csv")
     print("Final catalogue saved.")
 
-# Step 1: Generate and Save XML file. 
+# Step 0: Generate and Save XML file. 
 
 raw_root = "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/GEO/rna_seq_HomoSapien_raw_data/"
-xml_fname = "GEO_18-03-2025.xml"
+xml_fname = "GEO_24-06-2025.xml"
 main_root = "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/GEO/rna_seq_HomoSapien/"
 
 # Step 1 download th files
@@ -111,10 +117,10 @@ if STEP4:
         pickle.dump(files_list, f)
     print(f"Walking found {len(files_list)} files.")
 
-geo_brca = geo.GEO_BRCA()
-geo_blca = geo.GEO_BLCA()
-geo_paad = geo.GEO_PAAD()
-geo_coad = geo.GEO_COAD()
+geo_brca = geo.GEO_SUBTYPE_BRCA()
+geo_blca = geo.GEO_SUBTYPE_BLCA()
+geo_paad = geo.GEO_SUBTYPE_PAAD()
+geo_coad = geo.GEO_SUBTYPE_COAD()
 geo_surv = geo.GEO_SURV()
 
 # Step 5: Generate Catalogue for the experiments that will be used in downstream tasks
@@ -146,11 +152,22 @@ if STEP5:
     # geo_surv._gen_catalogue()
     # append_organism_to_catalogue(geo_surv)
     # geo_surv._apply_filter(organism=["Homo sapiens"], save_to_file=True)
-    geo_surv.catalogue = geo_surv.catalogue.reset_index(drop=True)
-    geo_surv._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_surv.catalogue = geo_surv.catalogue.reset_index(drop=True)
+    # geo_surv._split_catalogue(test_size=0.3) # TODO call grouping
+    print("Step 5 done!")
 
-# Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks. 
+# Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks. + filtering by homosapiens + removing sparse data. 
 if STEP6:
+    rna_seq_df = pd.read_csv(os.path.join("/projects/ovcare/users/behnam_maneshgar/coding/BulkRNA/data/tcga_sample.csv")) # @bulk
     exp_lists = [geo_brca.series, geo_blca.series, geo_paad.series, geo_coad.series, geo_surv.series]
     exp_gses = [item for sublist in exp_lists for item in sublist]
-    generate_catalogue(dataset=geo.GEO(), type='exc', experiments=exp_gses)
+    generate_catalogue(dataset=geo.GEO(), type='exc', experiments=exp_gses, sample_file=rna_seq_df)
+
+# Step 7: Remove low sample experiments from catalogue
+
+# Step 8: Remove outlier samples from catalogue, but using all samples form the series. 
+
+# Step 9: split the dataset into Train, Valid and Test
+if STEP9:
+    dataset = geo.GEO()
+    dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping

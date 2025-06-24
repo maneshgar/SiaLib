@@ -18,6 +18,14 @@ def get_common_genes_main(reference_data, target_data):
     target_data = target_data[common_genes]
     return common_genes, target_data
 
+def get_union_genes(reference_data, target_data, fill_value=0):
+    """
+    Get the union of genes from reference and target datasets.
+    """
+    union_genes = reference_data.columns.union(target_data.columns)  # Find all genes
+    target_data = target_data.reindex(columns=union_genes, fill_value=fill_value)  # Update data_2 to include all genes
+    return union_genes, target_data
+
 def get_common_genes(reference_data, target_data, ignore_subids=False, keep_duplicates=False):
     if ignore_subids:
         reference_data.columns = [item.split(".")[0] for item in reference_data.columns]
@@ -383,6 +391,47 @@ class Data(Dataset):
         for file in filenames:
             df_lists.append(self.load_pickle(file))
         return pd.concat(df_lists, ignore_index=True)
+
+    def gen_count_by_category(self, category, save_path=None):
+        """
+        Generate a count of samples by category (cancer type or subtype) and save it to a CSV file.
+        
+        Args:
+            save_path (str): Path to save the count CSV file. If None, the file will not be saved.
+        """
+        unique_indeces = self.catalogue[category].unique()
+        category_count = self.catalogue[category].value_counts()
+        return category_count
+
+    def drop_sparse_samples(self, genes_sample, threshold=0.5, save_to_file=False):
+        """
+        Drop samples with a high proportion of zero values in the specified genes.
+        
+        Args:
+            genes_list (list): List of genes to check for sparsity.
+            threshold (float): Proportion of zero values above which a sample is considered sparse.
+        """
+        # Calculate the number of genes
+        sparse_samples_ids = []
+
+        for sample_id, sample_fname in enumerate(self.catalogue['filename']):
+            # Load the data for the specified genes 
+            data = self.load_pickle(sample_fname)
+            common_genes, data_simplified = get_common_genes_main(genes_sample, data)
+            nb_genes = data_simplified.shape[1]
+            # Count zeros in each sample
+            nb_zeros = (data_simplified==0).sum().sum()
+
+            sparsness_score = float(nb_zeros)/float(nb_genes)
+            if sparsness_score >= threshold:
+                sparse_samples_ids.append(sample_id)
+                print(f"REMOVE :: Sample {sample_fname} has sparsness score of {sparsness_score}, threshold is {threshold}")
+            else: 
+                print(f"KEEP :: Sample {sample_fname} has sparsness score of {sparsness_score}, threshold is {threshold}")
+                
+
+        self.catalogue = self.catalogue.drop(index=sparse_samples_ids).reset_index(drop=True)
+        return self.catalogue
 
 class DataWrapper(Dataset):
     def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, cache_data=True):
