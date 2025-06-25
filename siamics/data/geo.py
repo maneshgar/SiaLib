@@ -226,7 +226,7 @@ class GEO(Data):
                             return
                         
                     # Check if it is not sparse
-                    if genes_sample_file:
+                    if genes_sample_file is not None:
                         genes_set, data_simplified = get_common_genes_main(reference_data=genes_sample_file, target_data=data)
                     else: 
                         data_simplified = data
@@ -246,6 +246,10 @@ class GEO(Data):
 
             except Exception as e: 
                 print(f"Catalogue::Broken File {filename} - Error: {e}")
+
+        # Debuggin Purpose only
+        # for file in files: 
+        #     process_file(file)
 
         # Process files in parallel using ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=16) as executor:

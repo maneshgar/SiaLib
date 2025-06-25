@@ -41,9 +41,12 @@ def convert_to_single_file_ensg_pickle(raw_root, main_root, xml_fname):
     print("GSM extraction is done.")
 
 def generate_catalogue(dataset, type=None, experiments=None, sample_file=None):
+    # generate catalogue, exclude the sparse samples. 
     dataset._gen_catalogue(experiments=experiments, type=type, sparsity=0.5, genes_sample_file=sample_file)
+    # Append organism to the catalogue if number of organisms is 1
     append_organism_to_catalogue(geo.GEO())
-    dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True)
+    # filter only the ones that have organism of Homo Sapiens. 
+    dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True) # saves to file
 
 def append_organism_to_catalogue(dataset):
     # Set GEOparse logging level
