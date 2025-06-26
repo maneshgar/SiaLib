@@ -3,6 +3,7 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import pandas as pd
 from lifelines import KaplanMeierFitter
 from lifelines.utils import concordance_index
 from lifelines.statistics import logrank_test
@@ -21,16 +22,25 @@ def cccr(true_prop, pred_prop):
 
 class Classification: 
 
-    def __init__(self, average='weighted', titles=None):
+    def __init__(self, average='weighted', titles=None, ordinal=False, soft_tolerance=2):
         self.average = average
         self.lbls = []
         self.preds = []
         self.titles = titles
+        self.ordinal=ordinal
+        self.soft_tolerance=soft_tolerance
 
-    def gen_heatmap(self, out_dir, figsize=(8, 6), filename="confusion_matrix.png"):
+    def gen_heatmap(self, out_dir, figsize=(8, 6), filename="confusion_matrix.png", exclude_diagonal=False):
+
+        # Zero or mask diagonal if requested
+        cm_to_plot = self.cm.copy()
+
+        if exclude_diagonal:
+            np.fill_diagonal(cm_to_plot, 0)  # or use np.nan to hide in heatmap
+
         # Create the heatmap
         plt.figure(figsize=figsize)
-        sns.heatmap(self.cm, annot=True, fmt="d", cmap="Blues", cbar=True, xticklabels=self.titles, yticklabels=self.titles)
+        sns.heatmap(cm_to_plot, annot=True, fmt="d", cmap="Blues", cbar=True, xticklabels=self.titles, yticklabels=self.titles)
 
         # Label axes
         plt.xlabel('Predicted Labels')
@@ -63,15 +73,45 @@ class Classification:
         self.recall     = metrics.recall_score         (self.lbls, self.preds, average=self.average, zero_division=0)
         self.cm         = metrics.confusion_matrix     (self.lbls, self.preds)
         self.report     = metrics.classification_report(self.lbls, self.preds)
+        if self.ordinal: 
+            self.soft_accuracy, self.soft_class_accuracy = self._calc_soft_accuracy(tolerance = 2)
         
     def print(self, update=True):
         if update: 
             self.update_metrics()
         print(f"Classification Report: \n{self.titles}\n{self.report}")
         print(f"Confusion Matrix: \n{self.titles}\n{self.cm}")
+        if self.ordinal: 
+            print(f"Soft Accuracy Tolerance: {self.soft_tolerance}")
+            print(f"Overal Soft Accuracy: {self.soft_accuracy}")
+            print(f"Per Class Soft Accuracy: {self.soft_class_accuracy}")
+
+    def _calc_soft_accuracy(self, tolerance=2):
+        """
+        Computes accuracy where a prediction is considered correct if it's within 
+        `tolerance` neighbors of the true class.
+        
+        Args:
+            y_true (array-like): True class labels (as integers).
+            y_pred (array-like): Predicted class labels (as integers).
+            tolerance (int): Number of allowed neighbors (e.g., ±1).
+        
+        Returns:
+            float: Tolerant accuracy score.
+        """
+        lbls = np.asarray(self.lbls)
+        preds = np.asarray(self.preds)
+        correct = np.abs(lbls - preds) <= tolerance
+        # Calc overal accuracy. 
+        overal_accuracy = np.sum(correct) / correct.shape[0]
+        # Calc per class accuracy.  
+        df = pd.DataFrame({'label': lbls, 'correct': correct})
+        result = df.groupby('label')['correct'].mean()
+        per_class_accuracy = result.to_dict()
+        return overal_accuracy, per_class_accuracy
 
 class ClassificationOnTheFly:
-    def __init__(self, average='weighted'):
+    def __init__(self, average='weighted', ordinal=False, soft_tolerance=2):
         self.average = average
         self.titles = []
         self.total_samples = 0
@@ -80,6 +120,10 @@ class ClassificationOnTheFly:
         self.fp = 0
         self.fn = 0
         self.tn = 0
+        # Soft prediction for ordinal classification
+        self.ordinal=ordinal
+        self.soft_tolerance = soft_tolerance
+        self.correct_soft_predictions = -1
 
     def get_titles(self):
         return self.titles
@@ -87,6 +131,7 @@ class ClassificationOnTheFly:
     def add_data(self, labels, preds): 
         self.total_samples += len(labels)
         self.correct_predictions += sum([1 for l, p in zip(labels, preds) if l == p])
+        if self.ordinal: self.correct_soft_predictions = (np.abs(np.asarray(labels) - np.asarray(preds)) <= self.soft_tolerance).sum()
         for l, p in zip(labels, preds):
             if l == p == 1:
                 self.tp += 1
@@ -100,10 +145,11 @@ class ClassificationOnTheFly:
     def update_metrics(self):
         try:
             self.accuracy = self.correct_predictions / self.total_samples
+            self.soft_accuracy = self.correct_soft_predictions / self.total_samples
             self.precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
             self.recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
             self.cm = [[self.tn, self.fp], [self.fn, self.tp]]
-            self.report = f"Accuracy: {self.accuracy}\nPrecision: {self.precision}\nRecall: {self.recall}"
+            self.report = f"Accuracy: {self.accuracy}\nSoft Tolerance: {self.soft_tolerance}, Soft Accuracy: {self.soft_accuracy}\nPrecision: {self.precision}\nRecall: {self.recall}"
         except ZeroDivisionError:
             print("Warning: ZeroDivisionError occurred while updating metrics.")
             self.accuracy = 0
