@@ -7,22 +7,33 @@ import pandas as pd
 
 # Download Files
 STEP1=False 
+
 # Extract single files
 STEP2=False  
+
 # copy the soft files into the foler. 
 STEP3=False
+
 # List all the files into another file. 
 STEP4=False
+
 # Generate catalogues for sub datasets 
 STEP5=False
+
 # generate catalgues for the pretraining big dataset. 
 STEP6=True
-# Remove sparse samples from the catalogue
+
+# Append metadata to the catalogue
 STEP7=False
-#
+
+# Filter the catalogue by organism and save it to file
 STEP8=False
-# Split catalogue to Train, Valid and Test
+
+# Outlier removal
 STEP9=False
+
+# Split catalogue to Train, Valid and Test
+STEP10=False
 
 
 def download_from_website(root, xml_fname):
@@ -39,14 +50,6 @@ def convert_to_single_file_ensg_pickle(raw_root, main_root, xml_fname):
     dataset.root = os.path.join(raw_root, "raw_data")
     dataset.extract_gsms(os.path.join(raw_root, xml_fname), main_root)
     print("GSM extraction is done.")
-
-def generate_catalogue(dataset, type=None, experiments=None, sample_file=None):
-    # generate catalogue, exclude the sparse samples. 
-    dataset._gen_catalogue(experiments=experiments, type=type, sparsity=0.5, genes_sample_file=sample_file)
-    # Append organism to the catalogue if number of organisms is 1
-    dataset.catalogue = append_metadata_to_catalogue(geo.GEO())
-    # filter only the ones that have organism of Homo Sapiens. 
-    dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True) # saves to file
 
 def append_metadata_to_catalogue(dataset):
     # Set GEOparse logging level
@@ -184,16 +187,27 @@ if STEP5:
 
 # Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks. + filtering by homosapiens + removing sparse data. 
 if STEP6:
+    dataset = geo.GEO()
     rna_seq_df = pd.read_csv(os.path.join("/projects/ovcare/users/behnam_maneshgar/coding/BulkRNA/data/tcga_sample.csv")) # @bulk
     exp_lists = [geo_brca.series, geo_blca.series, geo_paad.series, geo_coad.series, geo_surv.series]
     exp_gses = [item for sublist in exp_lists for item in sublist]
-    generate_catalogue(dataset=geo.GEO(), type='exc', experiments=exp_gses, sample_file=rna_seq_df)
+    dataset._gen_catalogue(experiments=exp_gses, type=type, sparsity=0.5, genes_sample_file=rna_seq_df)
 
-# Step 7: Remove low sample experiments from catalogue
+# Step 7: Append organism to the catalogue if number of organisms is 1
+if STEP7: 
+    dataset = geo.GEO()
+    append_metadata_to_catalogue(dataset)
 
 # Step 8: Remove outlier samples from catalogue, while using all samples form the series. 
+if STEP8: 
+    dataset = geo.GEO()
+    dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True) # saves to file
 
-# Step 9: split the dataset into Train, Valid and Test
-if STEP9:
+# Step 9: Outlier removal 
+if STEP9: 
+    dataset = geo.GEO()
+    
+# Step 10: split the dataset into Train, Valid and Test
+if STEP10:
     dataset = geo.GEO()
     dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping
