@@ -1,5 +1,7 @@
 import umap
 import numpy as np
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from io import BytesIO
@@ -238,8 +240,13 @@ def plot_hist(data, save_path=None):
     plt.ylabel("Frequency")
     plt.title("Histogram of Binned Token Frequencies")
     plt.xticks(np.arange(0, 65, step=5))  # Adjust ticks for readability
-    if not save_path:
-        save_path = "histogram.png"
+    if save_path is None:
+        # Get the current time as a string
+        current_time = datetime.now().strftime("%H%M%S")
+
+        # Append the timestamp to the filename
+        save_path = f"histogram_{current_time}.png"
+
     create_directories(save_path)
     plt.savefig(save_path, bbox_inches='tight')
     print(f"Histogram saved to {save_path}")

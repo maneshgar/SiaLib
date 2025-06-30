@@ -11,6 +11,7 @@ from scipy.stats import pearsonr, spearmanr
 from .futils import create_directories
 import jax.numpy as jnp
 from matplotlib.lines import Line2D
+from datetime import datetime
 
 def cccr(true_prop, pred_prop):
     mean_true = np.mean(true_prop)
@@ -30,7 +31,14 @@ class Classification:
         self.ordinal=ordinal
         self.soft_tolerance=soft_tolerance
 
-    def gen_heatmap(self, out_dir, figsize=(8, 6), filename="confusion_matrix.png", exclude_diagonal=False):
+    def gen_heatmap(self, out_dir, figsize=(8, 6), filename=None, exclude_diagonal=False):
+
+        if filename is None:
+            # Get the current time as a string
+            current_time = datetime.now().strftime("%H%M%S")
+
+            # Append the timestamp to the filename
+            filename = f"confusion_matrix_{current_time}.png"
 
         # Zero or mask diagonal if requested
         cm_to_plot = self.cm.copy()
@@ -123,7 +131,7 @@ class ClassificationOnTheFly:
         # Soft prediction for ordinal classification
         self.ordinal=ordinal
         self.soft_tolerance = soft_tolerance
-        self.correct_soft_predictions = -1
+        self.correct_soft_predictions = 0
 
     def get_titles(self):
         return self.titles
@@ -131,7 +139,7 @@ class ClassificationOnTheFly:
     def add_data(self, labels, preds): 
         self.total_samples += len(labels)
         self.correct_predictions += sum([1 for l, p in zip(labels, preds) if l == p])
-        if self.ordinal: self.correct_soft_predictions = (np.abs(np.asarray(labels) - np.asarray(preds)) <= self.soft_tolerance).sum()
+        if self.ordinal: self.correct_soft_predictions += (np.abs(np.asarray(labels) - np.asarray(preds)) <= self.soft_tolerance).sum()
         for l, p in zip(labels, preds):
             if l == p == 1:
                 self.tp += 1

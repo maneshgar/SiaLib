@@ -168,7 +168,7 @@ if STEP6:
 
 # Step 7: Remove low sample experiments from catalogue
 
-# Step 8: Remove outlier samples from catalogue, but using all samples form the series. 
+# Step 8: Remove outlier samples from catalogue, while using all samples form the series. 
 
 # Step 9: split the dataset into Train, Valid and Test
 if STEP9:
