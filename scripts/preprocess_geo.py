@@ -4,36 +4,39 @@ from siamics.utils import futils
 import logging
 from tqdm import tqdm
 import pandas as pd
+import sys
+
+step_number = sys.argv[1] if len(sys.argv) > 1 else False
 
 # Download Files
-STEP1=False 
+STEP1=False or step_number == "1"
 
 # Extract single files
-STEP2=False  
+STEP2=False or step_number == "2"
 
 # copy the soft files into the foler. 
-STEP3=False
+STEP3=False or step_number == "3"
 
 # List all the files into another file. 
-STEP4=False
+STEP4=False or step_number == "4"
 
 # Generate catalogues for sub datasets 
-STEP5=False
+STEP5=False or step_number == "5"
 
 # generate catalgues for the pretraining big dataset. 
-STEP6=True
+STEP6=False or step_number == "6"
 
 # Append metadata to the catalogue
-STEP7=False
+STEP7=False or step_number == "7"
 
 # Filter the catalogue by organism and save it to file
-STEP8=False
+STEP8=False or step_number == "8"
 
 # Outlier removal
-STEP9=False
+STEP9=False or step_number == "9"
 
 # Split catalogue to Train, Valid and Test
-STEP10=False
+STEP10=False or step_number == "10"
 
 
 def download_from_website(root, xml_fname):
@@ -191,21 +194,27 @@ if STEP6:
     rna_seq_df = pd.read_csv(os.path.join("/projects/ovcare/users/behnam_maneshgar/coding/BulkRNA/data/tcga_sample.csv")) # @bulk
     exp_lists = [geo_brca.series, geo_blca.series, geo_paad.series, geo_coad.series, geo_surv.series]
     exp_gses = [item for sublist in exp_lists for item in sublist]
-    dataset._gen_catalogue(experiments=exp_gses, type=type, sparsity=0.5, genes_sample_file=rna_seq_df)
+    catalogue = dataset._gen_catalogue(experiments=exp_gses, type=type, sparsity=0.5, genes_sample_file=rna_seq_df)
+    dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step6_genCat.csv") # extra: saving to have a backup of this step
+
 
 # Step 7: Append organism to the catalogue if number of organisms is 1
 if STEP7: 
     dataset = geo.GEO()
-    append_metadata_to_catalogue(dataset)
+    catalogue = append_metadata_to_catalogue(dataset)
+    dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step7_addMeta.csv") # extra: saving to have a backup of this step
+
 
 # Step 8: Remove outlier samples from catalogue, while using all samples form the series. 
 if STEP8: 
     dataset = geo.GEO()
-    dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True) # saves to file
+    catalogue = dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True) # saves to file
+    dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step8_applyFilter.csv") # extra: saving to have a backup of this step
 
 # Step 9: Outlier removal 
 if STEP9: 
     dataset = geo.GEO()
+    dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step9_outlier.csv") # extra: saving to have a backup of this step
     
 # Step 10: split the dataset into Train, Valid and Test
 if STEP10:
