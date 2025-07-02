@@ -7,6 +7,7 @@ import pandas as pd
 import sys
 
 step_number = sys.argv[1] if len(sys.argv) > 1 else False
+from siamics.data.geo_outlier import run_geo_outlier_pipeline
 
 # Download Files
 STEP1=False or step_number == "1"
@@ -29,10 +30,10 @@ STEP6=False or step_number == "6"
 # Append metadata to the catalogue
 STEP7=False or step_number == "7"
 
-# Filter the catalogue by organism and save it to file
+# Filter for humans, appropriate lib source and strategy
 STEP8=False or step_number == "8"
 
-# Outlier removal
+# Outlier + sparsity removal
 STEP9=False or step_number == "9"
 
 # Split catalogue to Train, Valid and Test
@@ -188,35 +189,49 @@ if STEP5:
     # geo_surv._split_catalogue(test_size=0.3) # TODO call grouping
     print("Step 5 done!")
 
-# Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks. + filtering by homosapiens + removing sparse data. 
+# Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks.
 if STEP6:
     dataset = geo.GEO()
     rna_seq_df = pd.read_csv(os.path.join("/projects/ovcare/users/behnam_maneshgar/coding/BulkRNA/data/tcga_sample.csv")) # @bulk
-    exp_lists = [geo_brca.series, geo_blca.series, geo_paad.series, geo_coad.series, geo_surv.series]
+    exp_lists = [geo_brca.series, geo_blca.series, geo_paad.series, geo_coad.series, geo_surv.series, "GSE157354"]
     exp_gses = [item for sublist in exp_lists for item in sublist]
     catalogue = dataset._gen_catalogue(experiments=exp_gses, type=type, sparsity=0.5, genes_sample_file=rna_seq_df)
     dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step6_genCat.csv") # extra: saving to have a backup of this step
 
 
-# Step 7: Append organism to the catalogue if number of organisms is 1
+# Step 7: Append organism (if # of org is 1), lib strategy and lib source to the catalogue
 if STEP7: 
     dataset = geo.GEO()
     catalogue = append_metadata_to_catalogue(dataset)
     dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step7_addMeta.csv") # extra: saving to have a backup of this step
 
 
-# Step 8: Remove outlier samples from catalogue, while using all samples form the series. 
+# Step 8: Filter for humans, appropriate lib source and strategy
 if STEP8: 
     dataset = geo.GEO()
-    catalogue = dataset._apply_filter(organism=["Homo sapiens"], save_to_file=True) # saves to file
+    catalogue = dataset._apply_filter(organism=["Homo sapiens"], lib_source_exc=["transcriptomic single cell", "other"], lib_str_inc=["RNA-Seq"], save_to_file=True) # saves to file
     dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step8_applyFilter.csv") # extra: saving to have a backup of this step
 
-# Step 9: Outlier removal 
+# Step 9: Outlier + sparse removal 
 if STEP9: 
     dataset = geo.GEO()
     dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step9_outlier.csv") # extra: saving to have a backup of this step
+    outliers = run_geo_outlier_pipeline(dataset.catalogue, verbose=False, logging=False)
+    outlier_df = pd.DataFrame(outliers, columns=["group_id", "sample_id"])
+
+    # Filter out rows where both group_id and sample_id match and drop sparse
+    merged = dataset.catalogue.merge(outlier_df, on=["group_id", "sample_id"], how="left", indicator=True)
+    filtered_catalogue = merged[
+        (merged["_merge"] == "left_only") & (~merged["is_sparse"])
+    ].drop(columns=["_merge"])
+
+    dataset.catalogue = filtered_catalogue
+    dataset.save(dataset.catalogue, f'{dataset.catname}.csv')
+
+    print("Removed outlier and sparse samples")
+
     
 # Step 10: split the dataset into Train, Valid and Test
 if STEP10:
     dataset = geo.GEO()
-    dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping
+#     dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping

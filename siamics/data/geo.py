@@ -185,6 +185,7 @@ class GEO(Data):
         gseid_list = [] 
         gsmid_list = [] 
         fnm_list = [] 
+        sparse_status = []
         # Set GEOparse logging level to WARNING (hides DEBUG and INFO messages)
         logging.getLogger("GEOparse").setLevel(logging.WARNING)
 
@@ -230,17 +231,26 @@ class GEO(Data):
                         genes_set, data_simplified = get_common_genes_main(reference_data=genes_sample_file, target_data=data)
                     else: 
                         data_simplified = data
-                        
+                    
+                    
+                    # zeros_count = (data_simplified == 0).sum().sum()
+                    # if zeros_count > (data_simplified.size * sparsity):
+                    #     print(f"Catalogue::Skipping {gse_id}:{gsm_id}::Sparse data with {zeros_count} zeros.")
+                    #     return
+
                     zeros_count = (data_simplified == 0).sum().sum()
                     if zeros_count > (data_simplified.size * sparsity):
-                        print(f"Catalogue::Skipping {gse_id}:{gsm_id}::Sparse data with {zeros_count} zeros.")
-                        return
+                        is_sparse = True
+                        print(f"Catalogue::Flagging {gse_id}:{gsm_id} as sparse: {zeros_count} zeros.")
+                    else:
+                        is_sparse = False
 
                     # Append results to shared lists in a thread-safe manner
                     with lock:
                         gseid_list.append(gse_id)
                         gsmid_list.extend(data.index.tolist())
                         fnm_list.append(filename[len(self.root)+1:])
+                        sparse_status.append(is_sparse)
                 else: 
                     print(f"Catalogue::skipping:GSE not found:: {filename}")
 
@@ -270,7 +280,10 @@ class GEO(Data):
             'group_id': gseid_list,
             'sample_id': gsmid_list,
             'organism': 'Unknown',
-            'filename': fnm_list
+            'filename': fnm_list,
+            'is_sparse': sparse_status,
+            'library_source': 'Unknown',
+            'library_strategy': 'Unknown',
         })
         self.save(data=self.catalogue, rel_path=f"{self.catname}.csv")
 
@@ -444,8 +457,8 @@ class GEO_SURV(GEO):
         return
     
 class GEO_BATCH(GEO):
-    def __init__(self, catname=None, catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, cancer_types=None, root=None, augment=False):
-        super().__init__(catname=catname, catalogue=catalogue, cancer_types=cancer_types, organism=organism, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+    def __init__(self, catname=None, catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, cancer_types=None, data_mode=None, root=None, augment=False):
+        super().__init__(catname=catname, catalogue=catalogue, cancer_types=cancer_types, organism=organism, dataType=dataType, embed_name=embed_name,data_mode=data_mode, root=root, augment=augment)
 
     def _read_batch_metadata(self, catalogue):
         batch_file = "batch_meta.csv"

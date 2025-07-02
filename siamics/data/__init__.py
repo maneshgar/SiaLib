@@ -237,9 +237,22 @@ class Data(Dataset):
         
         return self.trainset, self.validset, self.testset
         
-    def _apply_filter(self, organism= None, save_to_file=False): 
+    def _apply_filter(self, organism=None, lib_str_inc=None, lib_source_exc=None, min_sample=15, save_to_file=False): 
         if organism:
             self.catalogue = self.catalogue[self.catalogue['organism'].isin(organism)].reset_index(drop=True)
+
+        if lib_str_inc:
+            lib_str_pattern = '|'.join([fr'(?<!\w){re.escape(lib_str)}(?!\w)' for lib_str in lib_str_inc]) # not immediately surrounded by letters/digits
+            self.catalogue = self.catalogue[self.catalogue['library_strategy'].str.contains(lib_str_pattern, na=False, regex=True)].reset_index(drop=True)
+
+        if lib_source_exc:
+            self.catalogue = self.catalogue[~self.catalogue['library_source'].isin(lib_source_exc)].reset_index(drop=True)
+
+        # sample size filter
+        sample_size = self.catalogue[self.catalogue["is_sparse"] == False]["group_id"].value_counts()
+        valid_studies = sample_size[sample_size > min_sample].index
+        self.catalogue = self.catalogue[self.catalogue['group_id'].isin(valid_studies)].reset_index(drop=True)
+
         if save_to_file:
             self.save(self.catalogue, f'{self.catname}.csv')
         return self.catalogue
