@@ -215,7 +215,6 @@ if STEP8:
 # Step 9: Outlier + sparse removal 
 if STEP9: 
     dataset = geo.GEO()
-    dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step9_outlier.csv") # extra: saving to have a backup of this step
     outliers = run_geo_outlier_pipeline(dataset.catalogue, verbose=False, logging=False)
     outlier_df = pd.DataFrame(outliers, columns=["group_id", "sample_id"])
 
@@ -227,11 +226,10 @@ if STEP9:
 
     dataset.catalogue = filtered_catalogue
     dataset.save(dataset.catalogue, f'{dataset.catname}.csv')
-
     print("Removed outlier and sparse samples")
-
+    dataset.save(data=dataset.catalogue, rel_path=f"{dataset.catname}_step9_outlier.csv") # extra: saving to have a backup of this step
     
 # Step 10: split the dataset into Train, Valid and Test
 if STEP10:
     dataset = geo.GEO()
-#     dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping
+    dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping
