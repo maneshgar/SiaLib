@@ -238,25 +238,25 @@ if STEP5:
     # append_organism_to_catalogue(geo_brca)
     # geo_brca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_brca.catalogue = geo_brca.catalogue[geo_brca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_brca._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_brca._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
 
     # geo_blca._gen_catalogue()
     # append_organism_to_catalogue(geo_blca)
     # geo_blca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_blca.catalogue = geo_blca.catalogue[geo_blca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_blca._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_blca._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
 
     # geo_paad._gen_catalogue()
     # append_organism_to_catalogue(geo_paad)
     # geo_paad._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_paad.catalogue = geo_paad.catalogue[geo_paad.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_paad._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_paad._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
 
     # geo_coad._gen_catalogue()
     # append_organism_to_catalogue(geo_coad)
     # geo_coad._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_coad.catalogue = geo_coad.catalogue[geo_coad.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_coad._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_coad._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
 
     # geo_surv._gen_catalogue()
     # append_organism_to_catalogue(geo_surv)

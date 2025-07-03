@@ -190,13 +190,22 @@ class Data(Dataset):
     def _gen_catalogue(self):
         raise NotImplementedError
 
-    def _split_catalogue(self, test_size=0.3, mode="all"): # added mode for TME
+    def _split_catalogue(self, stratify_col=None, test_size=0.3, mode="all"): # added mode for TME
+        
         # Split data into 70% train and 30% temp
         if mode == "all":
-            trainset, temp = train_test_split(self.catalogue, test_size=test_size, random_state=42)
+            try:
+                trainset, temp = train_test_split(self.catalogue, test_size=test_size, stratify=self.catalogue[stratify_col], random_state=42)
+            except ValueError as e:
+                print(f"Stratified split failed: {e}. Proceeding with unstratified split (train).")
+                trainset, temp = train_test_split(self.catalogue, test_size=test_size, random_state=42)
 
             # Split the remaining 30% into 15% valid and 15% test
-            validset, testset = train_test_split(temp, test_size=0.5, random_state=42)
+            try:
+                validset, testset = train_test_split(temp, stratify=temp[stratify_col], test_size=0.5, random_state=42)
+            except ValueError as e:
+                print(f"Stratified split failed: {e}. Proceeding with unstratified split (valid,test).")
+                validset, testset = train_test_split(temp, test_size=0.5, random_state=42)
 
             self.trainset = trainset.reset_index(drop=True)
             self.validset = validset.reset_index(drop=True)
@@ -208,7 +217,12 @@ class Data(Dataset):
             self.testset  = self.catalogue.reset_index(drop=True)
         
         else:
-            trainset, validset = train_test_split(self.catalogue, test_size=test_size, random_state=42)
+            try:
+                trainset, validset = train_test_split(self.catalogue, test_size=test_size, stratify=stratify_col, random_state=42)
+            except ValueError as e:
+                print(f"Stratified split failed: {e}. Proceeding with unstratified split (train,valid).")
+                trainset, validset = train_test_split(self.catalogue, test_size=test_size, random_state=42)
+                
             self.trainset = trainset.reset_index(drop=True)
             self.validset = validset.reset_index(drop=True)
             self.testset  = pd.DataFrame()
