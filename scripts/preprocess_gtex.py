@@ -1,11 +1,11 @@
 
 from siamics.data import gtex   
 
-
-def generate_catalogue(ext='.csv'):
+def generate_catalogue():
     dataset = gtex.GTEx()
-    dataset._gen_catalogue(ext)
+    dataset.export_data(dataset.file_name, sep="\t")
+    dataset._gen_catalogue()
 
 
-generate_catalogue(ext='.tsv')
+generate_catalogue()
 

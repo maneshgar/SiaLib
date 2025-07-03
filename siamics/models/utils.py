@@ -176,4 +176,10 @@ def plot_grads_hist(grads, wandb_prefix):
         print("Warning:: plot grads hist failed!")
         return None
         
-    
+def gaussian_smooth_label(num_classes, true_label, sigma=0.5):
+    x = jnp.arange(num_classes)
+    dist = jnp.exp(-0.5 * ((x - true_label) / sigma) ** 2)
+    return dist / dist.sum()
+
+def batch_soft_labels(token_ids, num_classes, sigma=0.5):
+    return jax.vmap(lambda row: jax.vmap(lambda y: gaussian_smooth_label(num_classes, y, sigma))(row))(token_ids)

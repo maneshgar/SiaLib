@@ -7,6 +7,13 @@ from matplotlib.patches import Patch
 from io import BytesIO
 from siamics.utils.futils import create_directories
 
+def masked_mean(arr, mask):
+    """
+    Compute the mean of an array while ignoring masked values.
+    """
+    masked_arr = np.where(mask, arr, np.nan)  # Replace masked values with NaN
+    return np.nanmean(masked_arr, axis=1)  # Compute mean along the specified axis, ignoring NaNs
+
 def get_label_index(labels_list):
     map_dict={}
     types_unique = list(set(labels_list)) 

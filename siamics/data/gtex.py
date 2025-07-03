@@ -7,7 +7,8 @@ from tqdm import tqdm
 class GTEx(Data):
     
     def __init__(self, catalogue=None, root=None, embed_name=None, cancer_types=None, data_mode=None, augment=False):
-        self.file_name = "GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz"
+        self.file_name = "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz"
+        # self.file_name = "GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz"
         super().__init__("GTEx", catalogue=catalogue, data_mode=data_mode, root=root, embed_name=embed_name, augment=augment)
         if cancer_types:
             self.cancer_types = cancer_types
