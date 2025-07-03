@@ -61,22 +61,19 @@ def append_metadata_to_catalogue(dataset):
     print("Appending organism, library source and strategy to the catalogue.")
     catalogue = dataset.catalogue
     try: 
-        organisms=catalogue['organism']    
+        organisms = catalogue['organism'].copy()
     except:
         organisms = ["Unknown"] * catalogue.shape[0]
-        catalogue['organism'] = organisms
-        # catalogue = catalgue['dataset', 'cancer_type', 'group_id', 'sample_id', 'organism', 'filename']
-    try:
-        library_sources = catalogue['library_source']
-    except:
-        library_sources = ["Unknown"] * catalogue.shape[0]
-        catalogue['library_source'] = library_sources
 
     try:
-        library_strategies = catalogue['library_strategy']
+        library_sources = catalogue['library_source'].copy()
+    except:
+        library_sources = ["Unknown"] * catalogue.shape[0]
+
+    try:
+        library_strategies = catalogue['library_strategy'].copy()
     except:
         library_strategies = ["Unknown"] * catalogue.shape[0]
-        catalogue['library_strategy'] = library_strategies
         
     def process_row(index, row): 
         # if row['organism'] != 'Unknown' and row['library_source'] != 'Unknown' and row['library_strategy'] != 'Unknown':
@@ -89,16 +86,16 @@ def append_metadata_to_catalogue(dataset):
         geoObj = dataset._get_GeoObject(gse_id)  # Ensure thread safety
         metadata = geoObj.gsms[gsm_id].metadata
 
-        if len(metadata['organism_ch1']) > 1:
-            print(f"Warning:: len(metadata['organism_ch1']): {len(metadata['organism_ch1'])} ")
+        if len(metadata['organism_ch1']) == 1:
+            organisms.iloc[index] = metadata['organism_ch1'][0]
         else:
-            organisms[index] = metadata['organism_ch1'][0]
+            print(f"Warning:: len(metadata['organism_ch1']): {len(metadata['organism_ch1'])} ")
 
-        if row['library_source'] == 'Unknown' and 'library_source' in metadata and len(metadata['library_source']) > 0:
-            library_sources[index] = metadata['library_source'][0]
+        if library_sources.iloc[index] == 'Unknown' and 'library_source' in metadata and len(metadata['library_source']) > 0:
+            library_sources.iloc[index] = metadata['library_source'][0]
 
-        if row['library_strategy'] == 'Unknown' and 'library_strategy' in metadata and len(metadata['library_strategy']) > 0:
-            library_strategies[index] = metadata['library_strategy'][0]
+        if library_strategies.iloc[index] == 'Unknown' and 'library_strategy' in metadata and len(metadata['library_strategy']) > 0:
+            library_strategies.iloc[index] = metadata['library_strategy'][0]
         return
 
     # Sequential execution
@@ -110,7 +107,7 @@ def append_metadata_to_catalogue(dataset):
             catalogue['organism'] = organisms
             catalogue['library_source'] = library_sources
             catalogue['library_strategy'] = library_strategies
-            dataset.save(data=catalogue, rel_path=f"{dataset.catname}.csv")
+            dataset.save(data=catalogue, rel_path=f"{dataset.catname}_appTemp.csv")
             print(f"Saved progress at row {index + 1}")
 
     # Save the final result
