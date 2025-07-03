@@ -1,13 +1,17 @@
 import os, pickle
-from siamics.data import geo
-from siamics.utils import futils
 import logging
 from tqdm import tqdm
 import pandas as pd
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+
+from siamics.data import geo
+from siamics.utils import futils
+from siamics.data.geo_outlier import run_geo_outlier_pipeline
+
 
 step_number = sys.argv[1] if len(sys.argv) > 1 else False
-from siamics.data.geo_outlier import run_geo_outlier_pipeline
 
 # Download Files
 STEP1=False or step_number == "1"
@@ -55,26 +59,100 @@ def convert_to_single_file_ensg_pickle(raw_root, main_root, xml_fname):
     dataset.extract_gsms(os.path.join(raw_root, xml_fname), main_root)
     print("GSM extraction is done.")
 
+def append_metadata_to_catalogue_parallel(dataset, max_workers=8):
+    logging.getLogger("GEOparse").setLevel(logging.WARNING)
+    print("Appending organism, library source and strategy to the catalogue.")
+    catalogue = dataset.catalogue.copy()
+
+    # Initialize columns if they don't exist
+    if 'organism' not in catalogue.columns:
+        catalogue['organism'] = "Unknown"
+    if 'library_source' not in catalogue.columns:
+        catalogue['library_source'] = "Unknown"
+    if 'library_strategy' not in catalogue.columns:
+        catalogue['library_strategy'] = "Unknown"
+
+    # Shared memory-safe Series
+    organisms = catalogue['organism'].copy()
+    library_sources = catalogue['library_source'].copy()
+    library_strategies = catalogue['library_strategy'].copy()
+
+    def process_row(index, row):
+        updates = {}
+        # Skip if all metadata is already known
+        if row['organism'] != 'Unknown' and row['library_source'] != 'Unknown' and row['library_strategy'] != 'Unknown':
+            return index, {}
+
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{current_time}] Processing row {index + 1}/{len(catalogue)}", flush=True)
+        gse_id = row['group_id']
+        gsm_id = row['sample_id']
+        geoObj = dataset._get_GeoObject(gse_id)
+        metadata = geoObj.gsms[gsm_id].metadata
+
+        if len(metadata['organism_ch1']) == 1:
+            updates['organism'] = metadata['organism_ch1'][0]
+
+        if row['library_source'] == 'Unknown' and 'library_source' in metadata and len(metadata['library_source']) > 0:
+            updates['library_source'] = metadata['library_source'][0]
+
+        if row['library_strategy'] == 'Unknown' and 'library_strategy' in metadata and len(metadata['library_strategy']) > 0:
+            updates['library_strategy'] = metadata['library_strategy'][0]
+
+        return index, updates
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(process_row, idx, row): idx
+            for idx, row in catalogue.iterrows()
+        }
+
+        for i, future in enumerate(tqdm(as_completed(futures), total=len(futures), desc="Processing rows")):
+            index, updates = future.result()
+            if 'organism' in updates:
+                organisms.iloc[index] = updates['organism']
+            if 'library_source' in updates:
+                library_sources.iloc[index] = updates['library_source']
+            if 'library_strategy' in updates:
+                library_strategies.iloc[index] = updates['library_strategy']
+
+            # Periodic save
+            if ((i + 1) % 1000) == 0:
+                catalogue['organism'] = organisms
+                catalogue['library_source'] = library_sources
+                catalogue['library_strategy'] = library_strategies
+                dataset.save(data=catalogue, rel_path=f"{dataset.catname}.csv")
+                print(f"Saved progress at row {i + 1}")
+
+    # Final assignment and save
+    catalogue['organism'] = organisms
+    catalogue['library_source'] = library_sources
+    catalogue['library_strategy'] = library_strategies
+    dataset.save(data=catalogue, rel_path=f"{dataset.catname}.csv")
+    print("Final catalogue saved.")
+
+    dataset.catalogue = catalogue    
+    return catalogue
+
 def append_metadata_to_catalogue(dataset):
     # Set GEOparse logging level
     logging.getLogger("GEOparse").setLevel(logging.WARNING)
     print("Appending organism, library source and strategy to the catalogue.")
     catalogue = dataset.catalogue
-    try: 
-        organisms = catalogue['organism'].copy()
-    except:
-        organisms = ["Unknown"] * catalogue.shape[0]
+ 
+     # Initialize columns if they don't exist
+    if 'organism' not in catalogue.columns:
+        catalogue['organism'] = "Unknown"
+    if 'library_source' not in catalogue.columns:
+        catalogue['library_source'] = "Unknown"
+    if 'library_strategy' not in catalogue.columns:
+        catalogue['library_strategy'] = "Unknown"
 
-    try:
-        library_sources = catalogue['library_source'].copy()
-    except:
-        library_sources = ["Unknown"] * catalogue.shape[0]
+    # Shared memory-safe Series
+    organisms = catalogue['organism'].copy()
+    library_sources = catalogue['library_source'].copy()
+    library_strategies = catalogue['library_strategy'].copy()
 
-    try:
-        library_strategies = catalogue['library_strategy'].copy()
-    except:
-        library_strategies = ["Unknown"] * catalogue.shape[0]
-        
     def process_row(index, row): 
         # if row['organism'] != 'Unknown' and row['library_source'] != 'Unknown' and row['library_strategy'] != 'Unknown':
         #     return
@@ -113,10 +191,11 @@ def append_metadata_to_catalogue(dataset):
     # Save the final result
     catalogue['organism'] = organisms
     catalogue['library_source'] = library_sources
-    catalogue['library_strategy'] = library_strategies
+    catalogue['library_strategy'] = library_strategies    
     dataset.save(data=catalogue, rel_path=f"{dataset.catname}.csv")
     print("Final catalogue saved.")
 
+    dataset.catalogue = catalogue
     return catalogue
 
 # Step 0: Generate and Save XML file. 
@@ -199,7 +278,7 @@ if STEP6:
 # Step 7: Append organism (if # of org is 1), lib strategy and lib source to the catalogue
 if STEP7: 
     dataset = geo.GEO()
-    catalogue = append_metadata_to_catalogue(dataset)
+    catalogue = append_metadata_to_catalogue_parallel(dataset, max_workers=16)
     dataset.save(data=catalogue, rel_path=f"{dataset.catname}_step7_addMeta.csv") # extra: saving to have a backup of this step
 
 
@@ -212,7 +291,7 @@ if STEP8:
 # Step 9: Outlier + sparse removal 
 if STEP9: 
     dataset = geo.GEO()
-    outliers = run_geo_outlier_pipeline(dataset.catalogue, verbose=False, logging=False)
+    outliers = run_geo_outlier_pipeline(dataset.catalogue, main_root, os.path.join(raw_root, xml_fname), verbose=False, logging=False)
     outlier_df = pd.DataFrame(outliers, columns=["group_id", "sample_id"])
 
     # Filter out rows where both group_id and sample_id match and drop sparse

@@ -18,9 +18,6 @@ warnings.filterwarnings(
 
 logging.getLogger("GEOparse").setLevel(logging.WARNING)
 
-ROOT_DIR = "/projects/ovcare/users/tina_zhang/data/GEO/rna_seq_HomoSapien" #TODO: change
-GSM_LIST_PATH = "/projects/ovcare/users/tina_zhang/data/GEO/list_gsmfiles.pkl" #TODO: change
-
 # def get_rem_gse(catalogue, stats, nb_genes=19062, threshold=0.5, min_samples=15):
 #     filtered_catalogue = drop_sparse_data(catalogue, stats, nb_genes, threshold)
 #     gsm_counts = filtered_catalogue["group_id"].value_counts()
@@ -552,7 +549,7 @@ def removeFalsePositives(all_samples, outliers, q1_dict, q3_dict):
 
     return outliers
 
-def run_geo_outlier_pipeline(catalogue, logging=True, verbose=True):
+def run_geo_outlier_pipeline(catalogue, root_dir, gsm_list_path, logging=True, verbose=True):
     # get GSEs with remaining samples after dropping sparse:
     # full_catalogue = pd.read_csv("/projects/ovcare/users/tina_zhang/data/GEO/catalogue.csv")
     # dataset = GEO(catalogue=full_catalogue)
@@ -564,11 +561,11 @@ def run_geo_outlier_pipeline(catalogue, logging=True, verbose=True):
     gse_list = catalogue['group_id'].unique().tolist()
     not_converged_gse = []
     skipped_gse = []
-    soft_dir = os.path.join(ROOT_DIR, "softs")
+    soft_dir = os.path.join(root_dir, "softs")
     all_outlier_pairs = []
-    refined_outliers_path = os.path.join(ROOT_DIR, "outliers", "all_refined_outliers.csv")
+    refined_outliers_path = os.path.join(root_dir, "outliers", "all_refined_outliers.csv")
 
-    report_path = os.path.join(ROOT_DIR, "outliers", "all_gse_reports.json")
+    report_path = os.path.join(root_dir, "outliers", "all_gse_reports.json")
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
     if not os.path.exists(report_path):
         with open(report_path, "w") as f:
@@ -579,7 +576,7 @@ def run_geo_outlier_pipeline(catalogue, logging=True, verbose=True):
     for gse_id in tqdm(gse_list, desc="Processing GSEs"):
         gsm_ids = catalogue.loc[catalogue['group_id'] == gse_id, 'sample_id'].tolist()
 
-        output_dir = os.path.join(ROOT_DIR, "outliers", gse_id)
+        output_dir = os.path.join(root_dir, "outliers", gse_id)
 
         if logging:
             os.makedirs(output_dir, exist_ok=True)
@@ -603,7 +600,7 @@ def run_geo_outlier_pipeline(catalogue, logging=True, verbose=True):
             status.to_csv(output_status_path)
         
         print("Preparing expression matrices")
-        expr = load_and_concat_expression(GSM_LIST_PATH, gse_id, catalogue)
+        expr = load_and_concat_expression(gsm_list_path, gse_id, catalogue)
         filtered_expr = filter_expression_matrix(expr)
         if filtered_expr.shape[0] < filtered_expr.shape[1]:
             reason = "More samples than genes after filtering"
@@ -753,12 +750,12 @@ def run_geo_outlier_pipeline(catalogue, logging=True, verbose=True):
 
     if skipped_gse:
         skipped_df = pd.DataFrame(skipped_gse, columns=["gse_id", "reason"])
-        skipped_path = os.path.join(ROOT_DIR, "outliers", "skipped_gse.csv")
+        skipped_path = os.path.join(root_dir, "outliers", "skipped_gse.csv")
         skipped_df.to_csv(skipped_path, index=False)
 
     if not_converged_gse:
         not_converged_df = pd.DataFrame(not_converged_gse, columns=["gse_id"])
-        not_converged_path = os.path.join(ROOT_DIR, "outliers", "not_converged_gse.csv")
+        not_converged_path = os.path.join(root_dir, "outliers", "not_converged_gse.csv")
         not_converged_df.to_csv(not_converged_path, index=False)
 
     return all_outlier_pairs

@@ -46,13 +46,15 @@ class GTEx(Data):
         fnm_list = [f for f in os.listdir(dir) if f.endswith('.pkl')]
         sid_list = [os.path.splitext(file)[0] for file in fnm_list]
         
+        gid_list = [sid.split('-')[1] for sid in sid_list]
+        
         # add full path to the filename
         fnm_list = [os.path.join('data', file) for file in fnm_list]
 
         self.catalogue= pd.DataFrame({
             'dataset': self.name,
             'cancer_type': "Normal",
-            'group_id': "Unknown",
+            'group_id': gid_list,
             'sample_id': sid_list,
             'filename': fnm_list
         })

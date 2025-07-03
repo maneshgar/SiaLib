@@ -3,7 +3,6 @@ import numpy as np
 from datetime import datetime
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 from io import BytesIO
 from siamics.utils.futils import create_directories
 
