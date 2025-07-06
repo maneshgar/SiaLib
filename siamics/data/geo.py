@@ -333,76 +333,48 @@ class GEO(Data):
                     result = future.result()  # Process completed task
                     if result is not None:
                         pbar.update(1)  # Update tqdm only if successful
-                       
-class GEO_SUBTYPE_BRCA(GEO):
-    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BRCA'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
-        
+
+class GEO_SUBTYPE(GEO):
+    def __init__(self, catname, cancer_types, catalogue=None, organism="HomoSapien", dataType='TPM', data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
         self.cancer_types=cancer_types
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        self._gen_class_indeces_map(self.classes)
+        # drop if catalogue has unknown classes
+        if only_labeled_data:
+            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
+
+    def _gen_catalogue(self): 
+        super()._gen_catalogue(experiments=self.series, type="inc")
+        return
+
+    def print(self, verbose=True, categories_counts=["subtype"]):
+        super().print(verbose=verbose, categories_counts=categories_counts)
+
+class GEO_SUBTYPE_BRCA(GEO_SUBTYPE):
+    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BRCA'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
         self.series = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"] # TODO ADD GSE181466
         self.classes=["LuminalA", "LuminalB", "HER2", "Normal", "Basal"]
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
-        self._gen_class_indeces_map(self.classes)
-        # drop if catalogue has unknown classes
-        if only_labeled_data:
-            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
-
-    def _gen_catalogue(self): 
-        super()._gen_catalogue(experiments=self.series, type="inc")
-        return
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
                                                 
-class GEO_SUBTYPE_BLCA(GEO):
+class GEO_SUBTYPE_BLCA(GEO_SUBTYPE):
     def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BLCA'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
-        
-        self.cancer_types=cancer_types
         self.series = ["GSE244957", "GSE160693", "GSE154261"]
-        self.classes=["Basal", "Luminal"]
-        
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
-        self._gen_class_indeces_map(self.classes)
-        # drop if catalogue has unknown classes
-        if only_labeled_data:
-            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
+        self.classes=["Basal", "Luminal"]        
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
 
-    def _gen_catalogue(self): 
-        super()._gen_catalogue(experiments=self.series, type="inc")
-        return
     
-class GEO_SUBTYPE_PAAD(GEO):
+class GEO_SUBTYPE_PAAD(GEO_SUBTYPE):
     def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['PAAD'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
-        
-        self.cancer_types=cancer_types
         self.series = ["GSE172356", "GSE93326"]
         self.classes=["Classical", "Basal"]
-
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
-        self._gen_class_indeces_map(self.classes)
-        # drop if catalogue has unknown classes
-        if only_labeled_data:
-            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
-
-    def _gen_catalogue(self): 
-        super()._gen_catalogue(experiments=self.series, type="inc")
-
-        # find a way to add metadata
-        return
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
     
-class GEO_SUBTYPE_COAD(GEO):
+class GEO_SUBTYPE_COAD(GEO_SUBTYPE):
     def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['COAD'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
-        
-        self.cancer_types=cancer_types
         self.series = ["GSE190609", "GSE101588", "GSE152430", "GSE132465", "GSE144735"]
         self.classes=["CMS1","CMS2","CMS3","CMS4"]
-        
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
-        self._gen_class_indeces_map(self.classes)
-        # drop if catalogue has unknown classes
-        if only_labeled_data:
-            self.catalogue = self.catalogue[self.catalogue["subtype"].isin(self.classes)].reset_index(drop=True)
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
 
-    def _gen_catalogue(self): 
-        super()._gen_catalogue(experiments=self.series, type="inc")
-        return
-    
 class GEO_SURV(GEO):
     def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, data_mode=None, embed_name=None, root=None, augment=False, mode="overall"):
         

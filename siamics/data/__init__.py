@@ -460,6 +460,30 @@ class Data(Dataset):
         self.catalogue = self.catalogue.drop(index=sparse_samples_ids).reset_index(drop=True)
         return self.catalogue
 
+    def print(self, verbose=True, categories_counts=[]):
+        """
+        Print the details of the dataset.
+        
+        Args:
+            verbose (bool): If True, print detailed information about the dataset.
+        """
+        if verbose:
+            print(f"Dataset Name: {self.name}")
+            print(f"Data Mode: {self.data_mode}")
+            print(f"Number of Samples: {len(self)}")
+            print(f"Catalogue Columns: {self.catalogue.columns.tolist()}")
+            print(f"Cancer Types: {self.catalogue['cancer_type'].unique().tolist()}")
+            print(f"Subtypes: {self.catalogue['subtype'].unique().tolist()}")
+            
+            for col in self.catalogue.columns.tolist():
+                if col in categories_counts:
+                    class_counts = self.catalogue[col].value_counts()
+                    print("Number of samples per class:")
+                    print(class_counts.to_frame(name="Sample Count"))
+        else:
+            print(f"{self.name} dataset loaded with {len(self)} samples.")
+
+
 class DataWrapper(Dataset):
     def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, cache_data=True):
         """
@@ -497,6 +521,7 @@ class DataWrapper(Dataset):
 
         self.augment = augment
         self.update_lenghts()
+        self.catalogue = pd.concat([dataset.catalogue for dataset in self.datasets], ignore_index=True)
 
     def __len__(self):
         """
@@ -578,6 +603,30 @@ class DataWrapper(Dataset):
         dataset_specific_idx = np.array(dataset_specific_idx)
         overall_idx = np.array(overall_idx)
         return data_df, meta, dataset_specific_idx, overall_idx
+
+    def print(self, verbose=True, categories_counts=[]):
+        """
+        Print the details of the datasets.
+        """
+        if verbose:
+            print(f"DataWrapper with {len(self.dataset_objs)} datasets:")
+            for ind, d in enumerate(self.dataset_objs):
+                print(f"************* Dataset {ind+1} *************")
+                d.print()
+            # Print the total number of samples across all datasets
+            print(f"************* Total  *************")
+            print(f"Number of Samples: {len(self)}")
+            print(f"Catalogue Columns: {self.catalogue.columns.tolist()}")
+            
+            for col in self.catalogue.columns.tolist():
+                if col in categories_counts:
+                    class_counts = self.catalogue[col].value_counts()
+                    print("Number of samples per class:")
+                    print(class_counts.to_frame(name="Sample Count"))
+        else:
+            print(f"DataWrapper with {len(self.datasets)} datasets loaded with {len(self)} samples.")
+            
+        return True
 
     def clear_cache(self):
         """

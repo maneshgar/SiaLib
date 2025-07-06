@@ -86,6 +86,9 @@ class TCGA(Data):
     def get_nb_classes(self):
         return self.nb_classes
     
+    def print(self, verbose=True, categories_counts=["cancer_type"]):
+        super().print(verbose=verbose, categories_counts=categories_counts)
+    
     # AIM function
     def cp_from_server(self, root, cancer_types=None):
         rel_dir="Cases/*/Transcriptome Profiling/Gene Expression Quantification/*/*.tsv"
