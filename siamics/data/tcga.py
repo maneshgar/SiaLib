@@ -317,6 +317,9 @@ class TCGA_SUBTYPE(TCGA):
     def __init__(self, catalogue=None, catname=None, cancer_types=None, subtypes=None, classes=None, data_mode=None, root=None, embed_name=None, augment=False):
         super().__init__(catalogue=catalogue, catname=catname, classes=classes, cancer_types=cancer_types, subtypes=subtypes, data_mode=data_mode, root=root, embed_name=embed_name, augment=augment)
     
+    def print(self, verbose=True, categories_counts=["subtype"]):
+        super().print(verbose=verbose, categories_counts=categories_counts)
+
     def _gen_catalogue(self):
         tcga = TCGA()
         self.catalogue = self._read_subtype_metadata(tcga.catalogue, self.cancer, dropnan=True)

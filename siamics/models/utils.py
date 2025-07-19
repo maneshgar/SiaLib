@@ -1,13 +1,13 @@
 import optax, jax, wandb
 from jax import numpy as jnp
 
-def create_cosine_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=True, cosine_alpha=0.01):
+def create_cosine_lr_fn(num_epochs, base_learning_rate, steps_per_epoch, warmup=True, cosine_alpha=0.001):
     """Creates learning rate schedule."""
     total_steps = num_epochs * steps_per_epoch
     
     if warmup:
         warmup_steps = total_steps // 5
-        const_steps  = max(0, (total_steps) // 5)
+        const_steps  = max(0, (total_steps) // 10)
         cosine_steps = max(0, total_steps - (warmup_steps + const_steps))
 
         warmup_fn = optax.linear_schedule(init_value=base_learning_rate * 0.001, end_value=base_learning_rate, transition_steps=warmup_steps)

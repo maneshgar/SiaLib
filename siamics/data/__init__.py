@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import re
 from torch.utils.data import Dataset
 from siamics.utils import futils
 from sklearn.model_selection import train_test_split, GroupShuffleSplit
@@ -473,8 +474,11 @@ class Data(Dataset):
             print(f"Number of Samples: {len(self)}")
             print(f"Catalogue Columns: {self.catalogue.columns.tolist()}")
             print(f"Cancer Types: {self.catalogue['cancer_type'].unique().tolist()}")
-            print(f"Subtypes: {self.catalogue['subtype'].unique().tolist()}")
-            
+            try:
+                print(f"Subtypes: {self.catalogue['subtype'].unique().tolist()}")
+            except KeyError:
+                pass
+                
             for col in self.catalogue.columns.tolist():
                 if col in categories_counts:
                     class_counts = self.catalogue[col].value_counts()
@@ -502,7 +506,7 @@ class DataWrapper(Dataset):
         self.datasets_cls = datasets # GTEX, TCGA, etc.
         self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
 
-        if subset == 'full':
+        if subset == 'fullset':
             self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
             self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
@@ -511,7 +515,7 @@ class DataWrapper(Dataset):
         elif subset == 'testset':
             self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         else:
-            raise ValueError(f"Subset {subset} is not valid. Please choose from 'full', 'trainset', 'validset', or 'testset'.")
+            raise ValueError(f"Subset {subset} is not valid. Please choose from 'fullset', 'trainset', 'validset', or 'testset'.")
 
         # use a portion of the data only for debugging purpose.
         if sub_sampled:
@@ -521,7 +525,7 @@ class DataWrapper(Dataset):
 
         self.augment = augment
         self.update_lenghts()
-        self.catalogue = pd.concat([dataset.catalogue for dataset in self.datasets], ignore_index=True)
+        self._catalogue = pd.concat([dataset.catalogue for dataset in self.datasets], ignore_index=True)
 
     def __len__(self):
         """
@@ -567,6 +571,16 @@ class DataWrapper(Dataset):
     
         return (item, id)
 
+    def get_catalogue(self):
+        """
+        Get the combined catalogue of all datasets.
+        
+        Returns:
+            pd.DataFrame: Combined catalogue of all datasets.
+        """
+        self._catalogue = pd.concat([dataset.catalogue for dataset in self.datasets], ignore_index=True)
+        return self._catalogue
+    
     def update_lenghts(self):
         """
         Update the lengths of the datasets.
@@ -604,23 +618,23 @@ class DataWrapper(Dataset):
         overall_idx = np.array(overall_idx)
         return data_df, meta, dataset_specific_idx, overall_idx
 
-    def print(self, verbose=True, categories_counts=[]):
+    def print(self, verbose=True, categories_counts=['cancer_type', 'subtype']):
         """
         Print the details of the datasets.
         """
         if verbose:
             print(f"DataWrapper with {len(self.dataset_objs)} datasets:")
-            for ind, d in enumerate(self.dataset_objs):
+            for ind, d in enumerate(self.datasets):
                 print(f"************* Dataset {ind+1} *************")
-                d.print()
+                d.print(categories_counts=categories_counts)
             # Print the total number of samples across all datasets
             print(f"************* Total  *************")
             print(f"Number of Samples: {len(self)}")
-            print(f"Catalogue Columns: {self.catalogue.columns.tolist()}")
+            print(f"Catalogue Columns: {self.get_catalogue().columns.tolist()}")
             
-            for col in self.catalogue.columns.tolist():
+            for col in self.get_catalogue().columns.tolist():
                 if col in categories_counts:
-                    class_counts = self.catalogue[col].value_counts()
+                    class_counts = self.get_catalogue()[col].value_counts()
                     print("Number of samples per class:")
                     print(class_counts.to_frame(name="Sample Count"))
         else:

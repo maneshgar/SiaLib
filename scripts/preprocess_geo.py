@@ -202,6 +202,7 @@ def append_metadata_to_catalogue(dataset):
 
 raw_root = "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/GEO/rna_seq_HomoSapien_raw_data/"
 xml_fname = "GEO_24-06-2025.xml"
+pickle_flist = "list_gsmfiles.pkl"
 main_root = "/projects/ovcare/users/behnam_maneshgar/datasets/genomics/GEO/rna_seq_HomoSapien/"
 
 # Step 1 download th files
@@ -222,7 +223,7 @@ if STEP3:
 if STEP4:
     print("Starting to list all the files.")
     files_list = futils.list_files(os.path.join(main_root, "data"), extension=".pkl", depth=4)
-    with open(os.path.join(main_root, "list_gsmfiles.pkl"), "wb") as f:
+    with open(os.path.join(main_root, pickle_flist), "wb") as f:
         pickle.dump(files_list, f)
     print(f"Walking found {len(files_list)} files.")
 
@@ -291,7 +292,7 @@ if STEP8:
 # Step 9: Outlier + sparse removal 
 if STEP9: 
     dataset = geo.GEO()
-    outliers = run_geo_outlier_pipeline(dataset.catalogue, main_root, os.path.join(raw_root, xml_fname), verbose=False, logging=False)
+    outliers = run_geo_outlier_pipeline(dataset.catalogue, main_root, os.path.join(main_root, pickle_flist), verbose=False, logging=False)
     outlier_df = pd.DataFrame(outliers, columns=["group_id", "sample_id"])
 
     # Filter out rows where both group_id and sample_id match and drop sparse
@@ -308,4 +309,5 @@ if STEP9:
 # Step 10: split the dataset into Train, Valid and Test
 if STEP10:
     dataset = geo.GEO()
+    dataset.print(categories_counts=['group_id'])
     dataset._split_catalogue_grouping(y_colname='cancer_type', groups_colname='group_id') # TODO call grouping
