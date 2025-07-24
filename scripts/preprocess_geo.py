@@ -239,31 +239,31 @@ if STEP5:
     # append_organism_to_catalogue(geo_brca)
     # geo_brca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_brca.catalogue = geo_brca.catalogue[geo_brca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_brca._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
+    # geo_brca._add_kfold_catalogue(y_colname='subtype', cv_folds=10)
 
     # geo_blca._gen_catalogue()
     # append_organism_to_catalogue(geo_blca)
     # geo_blca._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_blca.catalogue = geo_blca.catalogue[geo_blca.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_blca._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
+    # geo_blca._add_kfold_catalogue(y_colname='subtype', cv_folds=10)
 
     # geo_paad._gen_catalogue()
     # append_organism_to_catalogue(geo_paad)
     # geo_paad._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_paad.catalogue = geo_paad.catalogue[geo_paad.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_paad._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
+    # geo_paad._add_kfold_catalogue(y_colname='subtype', cv_folds=10)
 
     # geo_coad._gen_catalogue()
     # append_organism_to_catalogue(geo_coad)
     # geo_coad._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_coad.catalogue = geo_coad.catalogue[geo_coad.catalogue['subtype'] != 'Unknown'].reset_index(drop=True)
-    # geo_coad._split_catalogue(test_size=0.3, stratify_col='subtype') # TODO call grouping
+    # geo_coad._add_kfold_catalogue(y_colname='subtype', cv_folds=10)
 
     # geo_surv._gen_catalogue()
     # append_organism_to_catalogue(geo_surv)
     # geo_surv._apply_filter(organism=["Homo sapiens"], save_to_file=True)
     # geo_surv.catalogue = geo_surv.catalogue.reset_index(drop=True)
-    # geo_surv._split_catalogue(test_size=0.3) # TODO call grouping
+    # geo_surv._add_kfold_catalogue(cv_folds=10)
     print("Step 5 done!")
 
 # Step 6: Generate the catalogue for the main GEO datase excluding the downstream tasks.

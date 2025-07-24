@@ -1,5 +1,29 @@
 from siamics.data import tcga
 
+dataset = tcga.TCGA_SUBTYPE_BRCA()
+dataset._add_groupKFold_catalogue(
+    y_colname='subtype',
+    groups_colname='patient_id',
+    cv_folds=10)
+
+dataset = tcga.TCGA_SUBTYPE_BLCA()
+dataset._add_groupKFold_catalogue(
+    y_colname='subtype',
+    groups_colname='patient_id',
+    cv_folds=10)
+
+dataset = tcga.TCGA_SUBTYPE_COAD()
+dataset._add_groupKFold_catalogue(
+    y_colname='subtype',
+    groups_colname='patient_id',
+    cv_folds=10)
+
+dataset = tcga.TCGA_SUBTYPE_PAAD()
+dataset._add_groupKFold_catalogue(
+    y_colname='subtype',
+    groups_colname='patient_id',
+    cv_folds=10)
+
 # root="/projects/AIM/TCGA"
 # root_2="/projects/ovcare/users/behnam_maneshgar/datasets/genomics/TCGA"
 
@@ -10,9 +34,9 @@ from siamics.data import tcga
 
 
 
-def test_tcga():
-    tcgaa = tcga.TCGA()
-    tcgaa._split_catalogue_grouping(y_colname='cancer_type', groups_colname='patient_id') # TODO split by grouping.
-    tcgaa.count_data()
+# def test_tcga():
+#     tcgaa = tcga.TCGA()
+#     tcgaa._split_catalogue_grouping(y_colname='cancer_type', groups_colname='patient_id') # TODO split by grouping.
+#     tcgaa.count_data()
 
-test_tcga()
+# test_tcga()

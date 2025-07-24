@@ -324,7 +324,6 @@ class TCGA_SUBTYPE(TCGA):
         tcga = TCGA()
         self.catalogue = self._read_subtype_metadata(tcga.catalogue, self.cancer, dropnan=True)
         self.save(self.catalogue, f'{self.catname}.csv')
-        self._split_catalogue()
 
 class TCGA_SUBTYPE_BRCA(TCGA_SUBTYPE):
     def __init__(self, catalogue=None, catname="catalogue_subtype_brca", cancer_types=['BRCA'], subtypes=None, classes=None, data_mode=None, root=None, embed_name=None, augment=False):

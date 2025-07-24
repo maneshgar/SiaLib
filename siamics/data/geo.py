@@ -382,8 +382,12 @@ class GEO_SURV(GEO):
         self.series = ["GSE154261", "GSE87340", "GSE165808"]
         self.ost_str = "os_time"
         self.oss_str = "os_status"
+        self.osf_str = "os_fold"
+        
         self.pfs_str = "pfi_status"
         self.pft_str = "pfi_time"
+        self.pff_str = "pfi_fold"
+
         self.time_unit = "days"
         self.mode = mode
         super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
@@ -391,6 +395,15 @@ class GEO_SURV(GEO):
         if self.cancer_types is not None:
             self.filter_by_cancer_types(cancer_types=self.cancer_types)
 
+    def _add_kfold_catalogue(self, cv_folds=10, shuffle=True, random_state=42):
+        self.catalogue[self.osf_str] = -1  # Initialize with invalid fold for overall survival
+        self.catalogue[self.pff_str] = -1  # Initialize with invalid fold for progression-free survival
+        
+        # Add K-Fold cross-validation folds for overall survival and progression-free survival
+        super()._add_kfold_catalogue(y_colname=self.oss_str, cv_folds=cv_folds, shuffle=shuffle, random_state=random_state, fold_colname=self.osf_str)
+        super()._add_kfold_catalogue(y_colname=self.pfs_str, cv_folds=cv_folds, shuffle=shuffle, random_state=random_state, fold_colname=self.pff_str)
+        return
+    
     def filter_by_cancer_types(self, cancer_types):
         self.catalogue = self.catalogue[self.catalogue["cancer_type"].isin(cancer_types)].reset_index(drop=True)
 

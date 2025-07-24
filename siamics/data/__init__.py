@@ -4,7 +4,7 @@ import numpy as np
 import re
 from torch.utils.data import Dataset
 from siamics.utils import futils
-from sklearn.model_selection import train_test_split, GroupShuffleSplit
+from sklearn.model_selection import train_test_split, GroupShuffleSplit, GroupKFold, KFold
 
 def remove_subids(data):
     data.columns = [item.split(".")[0] for item in data.columns]
@@ -59,6 +59,41 @@ def drop_sparse_data(catalogue, stats, nb_genes, threshold=0.5):
     cat = catalogue.merge(stats[['group_id', 'sample_id', 'zeros_count']], on=['group_id', 'sample_id'])
     filter = cat['zeros_count'] < zeros_thresh 
     return cat[filter].drop('zeros_count', axis=1).reset_index()
+
+def generate_fold_ids(nb_splits, nb_train_folds, nb_valid_folds, nb_test_folds, nb_folds=10):
+    """
+    Returns a list of (train_folds, valid_folds, test_folds) tuples.
+    Test folds rotate in blocks of size nb_test_folds.
+
+    Arguments:
+        nb_splits: number of rotation steps (usually nb_folds // nb_test_folds)
+        nb_train_folds: number of folds to use for training
+        nb_valid_folds: number of folds to use for validation
+        nb_test_folds: number of folds to use for test in each rotation
+        nb_folds: total number of folds in the full set (default = 10)
+    """
+    assert nb_train_folds + nb_valid_folds + nb_test_folds <= nb_folds, \
+        "Total number of folds used exceeds the available number of folds."
+    assert nb_splits * nb_test_folds <= nb_folds, \
+        "Test folds will be overlapping across splits!"
+
+    fold_ids = list(range(nb_folds))
+    fold_sets = []
+
+    for i in range(nb_splits):
+        offset = i * nb_test_folds
+        rotated = fold_ids[offset:] + fold_ids[:offset]
+
+        test_folds = rotated[:nb_test_folds]
+        train_folds = rotated[nb_test_folds:nb_test_folds + nb_train_folds]
+        valid_folds = rotated[nb_test_folds + nb_train_folds:
+                              nb_test_folds + nb_train_folds + nb_valid_folds]
+
+        fold_sets.append({'train': train_folds,
+                          'valid': valid_folds,
+                          'test': test_folds})
+
+    return fold_sets
 
 class Caching:
     def __init__(self, size=5000):
@@ -117,10 +152,14 @@ class Data(Dataset):
             # Default catalogue
             try:
                 self.get_catalogue(cancer_types=cancer_types, subtypes=subtypes)
-                self.get_subsets(cancer_types=cancer_types, subtypes=subtypes)
                 self.catalogue = self.catalogue.reset_index(drop=True)
             except:
                 print(f"Warning: {self.name} catalogue has not been generated yet!")
+
+            try:
+                self.get_subsets(cancer_types=cancer_types, subtypes=subtypes)
+            except:
+                print(f"Warning: {self.name} has no subsets, perhaps working with folds!")
 
         # If the path to the catalogue is provided
         elif isinstance(catalogue, str):
@@ -252,6 +291,48 @@ class Data(Dataset):
         
         return self.trainset, self.validset, self.testset
         
+    def _add_kfold_catalogue(self, y_colname, cv_folds=10, shuffle=True, random_state=42, fold_colname="fold"):
+        """
+        Assigns a fold number (0 to cv_folds-1) to each row in self.catalogue
+        using standard K-Fold cross-validation (no grouping).
+        """
+        kf = KFold(n_splits=cv_folds, shuffle=shuffle, random_state=random_state)
+        self.catalogue[fold_colname] = -1  # Initialize with invalid fold
+
+        y = self.catalogue[y_colname].values
+
+        for fold, (_, test_idx) in enumerate(kf.split(self.catalogue, y=y)):
+            self.catalogue.loc[test_idx, fold_colname] = fold
+
+        # Save updated catalogue
+        output_path = f"{self.catname}.csv"
+        self.save(self.catalogue, output_path)
+        print(f"K-Fold fold assignments saved to: {output_path}")
+
+        return self.catalogue
+    
+    def _add_groupKFold_catalogue(self, y_colname, groups_colname, cv_folds=10, fold_colname="fold"):
+        """
+        Assigns a fold number (0 to cv_folds-1) to each row in self.catalogue
+        using GroupKFold based on the provided group and target columns.
+        """
+
+        gkf = GroupKFold(n_splits=cv_folds)
+        self.catalogue[fold_colname] = -1  # Initialize with invalid fold
+
+        y = self.catalogue[y_colname].values
+        groups = self.catalogue[groups_colname].values
+
+        for fold, (_, test_idx) in enumerate(gkf.split(self.catalogue, y=y, groups=groups)):
+            self.catalogue.loc[test_idx, fold_colname] = fold
+
+        # Save updated catalogue
+        output_path = f"{self.catname}.csv"
+        self.save(self.catalogue, output_path)
+        print(f"GroupKFold fold assignments saved to: {output_path}")
+
+        return self.catalogue
+
     def _apply_filter(self, organism=None, lib_str_inc=None, lib_source_exc=None, min_sample=15, save_to_file=False): 
         if organism:
             self.catalogue = self.catalogue[self.catalogue['organism'].isin(organism)].reset_index(drop=True)
@@ -281,6 +362,9 @@ class Data(Dataset):
                 else:
                     if lbl == item: map_dict[lbl]=idx
         self.indeces_map = map_dict
+
+    def get_folds(self, folds):
+        return self.catalogue[self.catalogue["fold"].isin(folds)].reset_index(drop=True)
 
     def get_class_index(self, str_labels, indeces_map=None):
         if indeces_map==None:
@@ -487,9 +571,8 @@ class Data(Dataset):
         else:
             print(f"{self.name} dataset loaded with {len(self)} samples.")
 
-
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, cache_data=True):
+    def __init__(self, datasets, subset=None, folds=None, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, cache_data=True):
         """
         Initialize the DataWrapper with a list of datasets.
         
@@ -514,6 +597,8 @@ class DataWrapper(Dataset):
             self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
             self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
+        elif folds is not None:
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.get_folds(folds=folds), cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
         else:
             raise ValueError(f"Subset {subset} is not valid. Please choose from 'fullset', 'trainset', 'validset', or 'testset'.")
 
