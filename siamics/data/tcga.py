@@ -258,8 +258,10 @@ class TCGA_SURV(TCGA):
         self.subset="SURV"
         self.oss_str = "Overall Survival Status"
         self.ost_str = "Overall Survival (Months)"
+        self.osf_str = "Overall Survival Fold"
         self.pfs_str = "Progression Free Status"
         self.pft_str = "Progress Free Survival (Months)"
+        self.pff_str = "Progression Free Fold"
         self.time_unit = "months"
         self.mode = "overall"
 
@@ -279,6 +281,16 @@ class TCGA_SURV(TCGA):
             catalogue = catalogue.dropna()
         return catalogue.reset_index(drop=True)
 
+
+    def _add_kfold_catalogue(self, cv_folds=10, shuffle=True, random_state=42):
+        self.catalogue[self.osf_str] = -1  # Initialize with invalid fold for overall survival
+        self.catalogue[self.pff_str] = -1  # Initialize with invalid fold for progression-free survival
+        
+        # Add K-Fold cross-validation folds for overall survival and progression-free survival
+        super()._add_kfold_catalogue(y_colname=self.oss_str, cv_folds=cv_folds, shuffle=shuffle, random_state=random_state, fold_colname=self.osf_str)
+        super()._add_kfold_catalogue(y_colname=self.pfs_str, cv_folds=cv_folds, shuffle=shuffle, random_state=random_state, fold_colname=self.pff_str)
+        return
+  
     def _gen_catalogue(self):
         tcga = TCGA()
         self.catalogue = self._read_survival_metadata(tcga.catalogue)

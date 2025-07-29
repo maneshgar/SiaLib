@@ -545,31 +545,39 @@ class Data(Dataset):
         self.catalogue = self.catalogue.drop(index=sparse_samples_ids).reset_index(drop=True)
         return self.catalogue
 
-    def print(self, verbose=True, categories_counts=[]):
+    def to_string(self, verbose=True, categories_counts=[]):
         """
-        Print the details of the dataset.
+        Return the details of the dataset as a string instead of printing.
         
         Args:
-            verbose (bool): If True, print detailed information about the dataset.
+            verbose (bool): If True, include detailed information about the dataset.
+            categories_counts (list): Columns for which to show class distributions.
+        
+        Returns:
+            str: Summary of the dataset.
         """
+        output_lines = []
+
         if verbose:
-            print(f"Dataset Name: {self.name}")
-            print(f"Data Mode: {self.data_mode}")
-            print(f"Number of Samples: {len(self)}")
-            print(f"Catalogue Columns: {self.catalogue.columns.tolist()}")
-            print(f"Cancer Types: {self.catalogue['cancer_type'].unique().tolist()}")
+            output_lines.append(f"Dataset Name: {self.name}")
+            output_lines.append(f"Data Mode: {self.data_mode}")
+            output_lines.append(f"Number of Samples: {len(self)}")
+            output_lines.append(f"Catalogue Columns: {self.catalogue.columns.tolist()}")
+            output_lines.append(f"Cancer Types: {self.catalogue['cancer_type'].unique().tolist()}")
             try:
-                print(f"Subtypes: {self.catalogue['subtype'].unique().tolist()}")
+                output_lines.append(f"Subtypes: {self.catalogue['subtype'].unique().tolist()}")
             except KeyError:
                 pass
-                
+
             for col in self.catalogue.columns.tolist():
                 if col in categories_counts:
                     class_counts = self.catalogue[col].value_counts()
-                    print("Number of samples per class:")
-                    print(class_counts.to_frame(name="Sample Count"))
+                    output_lines.append(f"Number of samples per class for '{col}':")
+                    output_lines.append(class_counts.to_frame(name="Sample Count").to_string())
         else:
-            print(f"{self.name} dataset loaded with {len(self)} samples.")
+            output_lines.append(f"{self.name} dataset loaded with {len(self)} samples.")
+
+        return "\n".join(output_lines)
 
 class DataWrapper(Dataset):
     def __init__(self, datasets, subset=None, folds=None, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, cache_data=True):
@@ -703,29 +711,31 @@ class DataWrapper(Dataset):
         overall_idx = np.array(overall_idx)
         return data_df, meta, dataset_specific_idx, overall_idx
 
-    def print(self, verbose=True, categories_counts=['cancer_type', 'subtype']):
+    def to_string(self, verbose=True, categories_counts=['cancer_type', 'subtype']):
         """
-        Print the details of the datasets.
+        Return the details of the datasets as a string instead of printing.
         """
+        output_lines = []
+
         if verbose:
-            print(f"DataWrapper with {len(self.dataset_objs)} datasets:")
+            output_lines.append(f"DataWrapper with {len(self.dataset_objs)} datasets:")
             for ind, d in enumerate(self.datasets):
-                print(f"************* Dataset {ind+1} *************")
-                d.print(categories_counts=categories_counts)
-            # Print the total number of samples across all datasets
-            print(f"************* Total  *************")
-            print(f"Number of Samples: {len(self)}")
-            print(f"Catalogue Columns: {self.get_catalogue().columns.tolist()}")
-            
+                output_lines.append(f"************* Dataset {ind+1} *************")
+                output_lines.append(d.to_string(categories_counts=categories_counts))  # assumes `d.print()` has a `to_string()` equivalent
+            output_lines.append(f"************* Total  *************")
+            output_lines.append(f"Number of Samples: {len(self)}")
+            output_lines.append(f"Catalogue Columns: {self.get_catalogue().columns.tolist()}")
+
             for col in self.get_catalogue().columns.tolist():
                 if col in categories_counts:
                     class_counts = self.get_catalogue()[col].value_counts()
-                    print("Number of samples per class:")
-                    print(class_counts.to_frame(name="Sample Count"))
+                    output_lines.append(f"Number of samples per class for '{col}':")
+                    output_lines.append(class_counts.to_frame(name="Sample Count").to_string())
         else:
-            print(f"DataWrapper with {len(self.datasets)} datasets loaded with {len(self)} samples.")
-            
-        return True
+            output_lines.append(f"DataWrapper with {len(self.datasets)} datasets loaded with {len(self)} samples.")
+        
+        output_lines.append(f"************** End  **************")
+        return "\n".join(output_lines)
 
     def clear_cache(self):
         """
