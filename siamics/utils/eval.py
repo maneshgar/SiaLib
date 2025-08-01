@@ -188,11 +188,11 @@ class Survival:
        
     def update_metrics(self):
         
-        filter = (np.array(self.events) == 1)
-        filtered_times = np.array(self.survival_time)[filter]
-        filtered_scores = np.array(self.risk_score)[filter]
+        # filter = (np.array(self.events) == 1)
+        filtered_times = np.array(self.survival_time)
+        filtered_scores = np.array(self.risk_score)
 
-        self.c_index = concordance_index(filtered_times, -filtered_scores)
+        self.c_index = concordance_index(filtered_times, -filtered_scores, event_observed=self.events)
         
         return self.c_index
     
