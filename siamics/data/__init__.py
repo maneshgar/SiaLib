@@ -333,13 +333,13 @@ class Data(Dataset):
 
         return self.catalogue
 
-    def _apply_filter(self, organism=None, lib_str_inc=None, lib_source_exc=None, min_sample=15, save_to_file=False, sample_type=None, filter_sparse=False): 
+    def _apply_filter(self, organism=None, lib_str_inc=None, lib_source_exc=None, min_sample=15, save_to_file=False, exc_sample_type=None, filter_sparse=False): 
         if organism:
             self.catalogue = self.catalogue[self.catalogue['organism'].isin(organism)].reset_index(drop=True)
 
-        if sample_type: 
-            self.catalogue = self.catalogue[self.catalogue['sample_type'] == sample_type].reset_index(drop=True)
-
+        if exc_sample_type: 
+            self.catalogue = self.catalogue[self.catalogue['sample_type'] != exc_sample_type].reset_index(drop=True)
+       
         if lib_str_inc:
             lib_str_pattern = '|'.join([fr'(?<!\w){re.escape(lib_str)}(?!\w)' for lib_str in lib_str_inc]) # not immediately surrounded by letters/digits
             self.catalogue = self.catalogue[self.catalogue['library_strategy'].str.contains(lib_str_pattern, na=False, regex=True)].reset_index(drop=True)

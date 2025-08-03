@@ -11,7 +11,7 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, catname="catalogue", sample_type="Primary Tumor", classes=None, cancer_types=None, subtypes=None, data_mode=None, root=None, embed_name=None, augment=False):
+    def __init__(self, catalogue=None, catname="catalogue", exc_sample_type="Solid Tissue Normal", classes=None, cancer_types=None, subtypes=None, data_mode=None, root=None, embed_name=None, augment=False):
         self.geneID = "gene_id"
         self.grouping_col = "patient_id" # was patient_id
 
@@ -35,8 +35,8 @@ class TCGA(Data):
         super().__init__("TCGA", catalogue=catalogue, catname=catname, cancer_types=self.cancer_types, subtypes=subtypes, data_mode=data_mode, root=root, embed_name=embed_name, augment=augment)
         
         # Filter catalogue based on sample type ,Primary Tumor, Solid Tissue Normal
-        if sample_type is not None:
-            self._apply_filter(sample_type=sample_type)
+        if exc_sample_type is not None:
+            self._apply_filter(exc_sample_type=exc_sample_type)
 
         self._gen_class_indeces_map(self.classes)
 
