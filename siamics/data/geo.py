@@ -361,8 +361,7 @@ class GEO_SUBTYPE_BLCA(GEO_SUBTYPE):
         self.series = ["GSE244957", "GSE160693", "GSE154261"]
         self.classes=["Basal", "Luminal"]        
         super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
-
-    
+ 
 class GEO_SUBTYPE_PAAD(GEO_SUBTYPE):
     def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['PAAD'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
         self.series = ["GSE172356", "GSE93326"]
@@ -394,6 +393,15 @@ class GEO_SURV(GEO):
         
         if self.cancer_types is not None:
             self.filter_by_cancer_types(cancer_types=self.cancer_types)
+
+    def get_folds(self, folds):
+        if self.mode == "overall":
+            fold_col = self.osf_str
+        elif self.mode == "pfi":
+            fold_col = self.pff_str
+        else:
+            raise ValueError(f"Invalid mode '{self.mode}'. Survival mode must be set to either 'overall' or 'pfi'.")
+        return self.catalogue[self.catalogue[fold_col].isin(folds)].reset_index(drop=True)
 
     def _add_kfold_catalogue(self, cv_folds=10, shuffle=True, random_state=42):
         self.catalogue[self.osf_str] = -1  # Initialize with invalid fold for overall survival

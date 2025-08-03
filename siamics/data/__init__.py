@@ -333,9 +333,12 @@ class Data(Dataset):
 
         return self.catalogue
 
-    def _apply_filter(self, organism=None, lib_str_inc=None, lib_source_exc=None, min_sample=15, save_to_file=False): 
+    def _apply_filter(self, organism=None, lib_str_inc=None, lib_source_exc=None, min_sample=15, save_to_file=False, sample_type=None, filter_sparse=False): 
         if organism:
             self.catalogue = self.catalogue[self.catalogue['organism'].isin(organism)].reset_index(drop=True)
+
+        if sample_type: 
+            self.catalogue = self.catalogue[self.catalogue['sample_type'] == sample_type].reset_index(drop=True)
 
         if lib_str_inc:
             lib_str_pattern = '|'.join([fr'(?<!\w){re.escape(lib_str)}(?!\w)' for lib_str in lib_str_inc]) # not immediately surrounded by letters/digits
@@ -345,9 +348,10 @@ class Data(Dataset):
             self.catalogue = self.catalogue[~self.catalogue['library_source'].isin(lib_source_exc)].reset_index(drop=True)
 
         # sample size filter
-        sample_size = self.catalogue[self.catalogue["is_sparse"] == False]["group_id"].value_counts()
-        valid_studies = sample_size[sample_size > min_sample].index
-        self.catalogue = self.catalogue[self.catalogue['group_id'].isin(valid_studies)].reset_index(drop=True)
+        if filter_sparse:
+            sample_size = self.catalogue[self.catalogue["is_sparse"] == False]["group_id"].value_counts()
+            valid_studies = sample_size[sample_size > min_sample].index
+            self.catalogue = self.catalogue[self.catalogue['group_id'].isin(valid_studies)].reset_index(drop=True)
 
         if save_to_file:
             self.save(self.catalogue, f'{self.catname}.csv')

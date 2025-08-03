@@ -11,7 +11,7 @@ from siamics.utils import futils
 
 class TCGA(Data):
 
-    def __init__(self, catalogue=None, catname="catalogue", classes=None, cancer_types=None, subtypes=None, data_mode=None, root=None, embed_name=None, augment=False):
+    def __init__(self, catalogue=None, catname="catalogue", sample_type="Primary Tumor", classes=None, cancer_types=None, subtypes=None, data_mode=None, root=None, embed_name=None, augment=False):
         self.geneID = "gene_id"
         self.grouping_col = "patient_id" # was patient_id
 
@@ -33,6 +33,11 @@ class TCGA(Data):
 
         self.nb_classes = len(self.classes)
         super().__init__("TCGA", catalogue=catalogue, catname=catname, cancer_types=self.cancer_types, subtypes=subtypes, data_mode=data_mode, root=root, embed_name=embed_name, augment=augment)
+        
+        # Filter catalogue based on sample type ,Primary Tumor, Solid Tissue Normal
+        if sample_type is not None:
+            self._apply_filter(sample_type=sample_type)
+
         self._gen_class_indeces_map(self.classes)
 
     def _gen_catalogue(self, dirname, ext='.csv'):
@@ -281,6 +286,14 @@ class TCGA_SURV(TCGA):
             catalogue = catalogue.dropna()
         return catalogue.reset_index(drop=True)
 
+    def get_folds(self, folds):
+        if self.mode == "overall":
+            fold_col = self.osf_str
+        elif self.mode == "pfi":
+            fold_col = self.pff_str
+        else:
+            raise ValueError(f"Invalid mode '{self.mode}'. Survival mode must be set to either 'overall' or 'pfi'.")
+        return self.catalogue[self.catalogue[fold_col].isin(folds)].reset_index(drop=True)
 
     def _add_kfold_catalogue(self, cv_folds=10, shuffle=True, random_state=42):
         self.catalogue[self.osf_str] = -1  # Initialize with invalid fold for overall survival

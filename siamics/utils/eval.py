@@ -79,6 +79,8 @@ class Classification:
         self.accuracy   = metrics.accuracy_score       (self.lbls, self.preds)
         self.precision  = metrics.precision_score      (self.lbls, self.preds, average=self.average, zero_division=0)
         self.recall     = metrics.recall_score         (self.lbls, self.preds, average=self.average, zero_division=0)
+        self.weightedf1 = metrics.f1_score(self.lbls, self.preds, average='weighted')
+
         self.cm         = metrics.confusion_matrix     (self.lbls, self.preds)
         self.report     = metrics.classification_report(self.lbls, self.preds)
         if self.ordinal: 
@@ -88,6 +90,8 @@ class Classification:
         if update: 
             self.update_metrics()
         print(f"Classification Report: \n{self.titles}\n{self.report}")
+        print(f"Weighted F1: \n{self.weightedf1}\n")
+        
         print(f"Confusion Matrix: \n{self.titles}\n{self.cm}")
         if self.ordinal: 
             print(f"Soft Accuracy Tolerance: {self.soft_tolerance}")
