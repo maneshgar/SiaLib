@@ -36,8 +36,11 @@ class TCGA(Data):
         
         # Filter catalogue based on sample type ,Primary Tumor, Solid Tissue Normal
         if exc_sample_type is not None:
-            self._apply_filter(exc_sample_type=exc_sample_type)
-
+            try: 
+                self._apply_filter(exc_sample_type=exc_sample_type)
+            except KeyError:
+                print(f"Warning: {exc_sample_type} not found in catalogue. Skipping filter application.")
+                
         self._gen_class_indeces_map(self.classes)
 
     def _gen_catalogue(self, dirname, ext='.csv'):

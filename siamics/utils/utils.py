@@ -3,6 +3,8 @@ import numpy as np
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import seaborn as sns
+
 from io import BytesIO
 from siamics.utils.futils import create_directories
 
@@ -30,6 +32,57 @@ def class_colour(type="cancer_type"):
     }
 
     return values.get(type, [])
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import os
+from datetime import datetime
+
+def plot_heatmap(data, labels=None, title="Heatmap", xlabel="X-axis", ylabel="Y-axis", save_path=None):
+    """
+    Plot a heatmap using matplotlib and seaborn.
+
+    Parameters:
+        data (array-like): 2D array for heatmap data.
+        labels (list of str, optional): Labels for y-axis (rows). X-axis uses index by default.
+        title (str, optional): Title of the heatmap.
+        xlabel (str, optional): Label for the x-axis.
+        ylabel (str, optional): Label for the y-axis.
+        save_path (str, optional): Path to save the heatmap image.
+
+    Returns:
+        str: Path to saved image
+    """
+    data = np.array(data)
+    fig, ax = plt.subplots(figsize=(10, max(4, len(data) * 0.4)))
+
+    sns.heatmap(
+        data,
+        annot=True,
+        fmt=".2f",
+        cmap='viridis',
+        xticklabels=True,
+        yticklabels=labels if labels is not None else True,
+        ax=ax
+    )
+
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    if save_path is None:
+        # Auto-generate filename with timestamp
+        current_time = datetime.now().strftime("%H%M%S")
+        save_path = f"heatmap_{current_time}.png"
+
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Heatmap saved to {save_path}")
+    return save_path
 
 def plot_umap(
     data=None, 
