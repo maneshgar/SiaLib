@@ -4,18 +4,19 @@ import os
 from glob import glob
 from . import Data
 from tqdm import tqdm
+import warnings
 
-warnings.filterwarnings("ignore", category=DtypeWarning)
+# warnings.filterwarnings("ignore", category=DtypeWarning)
 class TME(Data):
-    def __init__(self, dataset_name, catalogue=None, catname="catalogue", root=None, classes=None, cancer_types=None, embed_name=None, singleCell=False, celltype_mapping=None, augment=False):
+    def __init__(self, dataset_name, catalogue=None, catname="catalogue", root=None, classes=None, cancer_types=None, embed_name=None, data_mode=None, singleCell=False, celltype_mapping=None, augment=False, single_cell=False):
         
         name = "".join(["TME", f"/{dataset_name}"])
 
-        super().__init__(name, catalogue=catalogue, catname=catname, root=root, cancer_types=cancer_types, embed_name=embed_name, augment=augment)
+        super().__init__(name, catalogue=catalogue, catname=catname, root=root, cancer_types=cancer_types, embed_name=embed_name, data_mode=data_mode, augment=augment, single_cell=single_cell)
 
         self.dataset_name = dataset_name  # e.g., "SDY67"
         self.grouping_col = "sample_id"
-
+        self.single_cell = single_cell
         self.singleCell = singleCell
 
         # self.classes = [
@@ -275,7 +276,7 @@ class GSE107011(TME):
         return meta
 
 class Com(TME):
-    def __init__(self, root=None, catalogue=None, catname="catalogue_com", cancer_types=None, embed_name=None, singleCell=False, augment=False):
+    def __init__(self, root=None, catalogue=None, catname="catalogue_com", cancer_types=None, embed_name=None, data_mode=None, singleCell=False, augment=False, single_cell=False):
         celltype_mapping = {
             "B": ["naive.B.cells", "memory.B.cells", "B.cells"],
             "CD4T": ["memory.CD4.T.cells", "naive.CD4.T.cells", "regulatory.T.cells", "CD4.T.cells"],
@@ -287,7 +288,7 @@ class Com(TME):
             "fibroblasts": ["fibroblasts"]
         }
 
-        super().__init__(dataset_name="Com", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, cancer_types=cancer_types, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment)
+        super().__init__(dataset_name="Com", catalogue=catalogue, catname=catname, root=root, embed_name=embed_name, data_mode=data_mode, cancer_types=cancer_types, celltype_mapping=celltype_mapping, singleCell=singleCell, augment=augment, single_cell=single_cell)
 
     def process_expression(self, invitro=False, wu=False):
         if wu:

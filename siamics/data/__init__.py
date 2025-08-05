@@ -6,6 +6,20 @@ from torch.utils.data import Dataset
 from siamics.utils import futils
 from sklearn.model_selection import train_test_split, GroupShuffleSplit, GroupKFold, KFold
 
+def convert_gene_names(gene_names):
+
+    mapping_file = "/projects/ovcare/users/tina_zhang/projects/BulkRNA/data/mapping_all.txt"
+    df = pd.read_csv(mapping_file, sep="\t")
+    
+    df["gene_name"] = df["gene_name"].astype(str).str.strip()
+    df["gene_id"] = df["gene_id"].astype(str).str.strip()
+
+    mapping = dict(zip(df["gene_name"], df["gene_id"]))
+
+    gene_names = [str(g).strip() for g in gene_names]
+
+    return [mapping.get(g) for g in gene_names]
+
 def remove_subids(data):
     data.columns = [item.split(".")[0] for item in data.columns]
     # Cases to handle:
@@ -118,7 +132,7 @@ class Caching:
 
 class Data(Dataset):
 
-    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, subtypes=None, data_mode='raw', root=None, embed_name=None, augment=False):
+    def __init__(self, name, catalogue=None, catname="catalogue", relpath="", cancer_types=None, subtypes=None, data_mode='raw', root=None, embed_name=None, augment=False, single_cell=False):
 
         self.name = name
         self.embed_name = embed_name
@@ -126,6 +140,7 @@ class Data(Dataset):
         self.catname = catname
         self.remove_subids = True
         self.indeces_map = None
+        self.single_cell = single_cell
 
         self.valid_modes=['raw', 'features', 'mean_features']
 
@@ -182,6 +197,10 @@ class Data(Dataset):
         # if embeddings are available
         if self.data_mode == 'raw':
             file_path = self.catalogue.loc[idx, 'filename']
+
+            if self.single_cell and file_path.endswith(".pkl"):
+                file_path = re.sub(r"\.pkl$", "_raw.pkl", file_path)
+
             data = self.load_pickle(file_path)
 
             if self.remove_subids:
@@ -584,7 +603,7 @@ class Data(Dataset):
         return "\n".join(output_lines)
 
 class DataWrapper(Dataset):
-    def __init__(self, datasets, subset=None, folds=None, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, cache_data=True):
+    def __init__(self, datasets, subset=None, folds=None, cancer_types=None, root=None, augment=False, embed_name=None, data_mode=None, sub_sampled=False, single_cell=False, cache_data=True):
         """
         Initialize the DataWrapper with a list of datasets.
         
@@ -599,18 +618,20 @@ class DataWrapper(Dataset):
         self.cancer_types = cancer_types
 
         self.datasets_cls = datasets # GTEX, TCGA, etc.
-        self.dataset_objs = [dataset(root=root, augment=augment) for dataset in self.datasets_cls]
+        self.dataset_objs = [dataset(root=root, augment=augment, single_cell=single_cell) for dataset in self.datasets_cls]
+
+
 
         if subset == 'fullset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode, single_cell=single_cell) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'trainset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.trainset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode, single_cell=single_cell) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'validset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.validset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode, single_cell=single_cell) for index, dataset in enumerate(self.dataset_objs)]
         elif subset == 'testset':
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.testset, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode, single_cell=single_cell) for index, dataset in enumerate(self.dataset_objs)]
         elif folds is not None:
-            self.datasets = [self.datasets_cls[index](catalogue=dataset.get_folds(folds=folds), cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode) for index, dataset in enumerate(self.dataset_objs)]
+            self.datasets = [self.datasets_cls[index](catalogue=dataset.get_folds(folds=folds), cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode, single_cell=single_cell) for index, dataset in enumerate(self.dataset_objs)]
         else:
             raise ValueError(f"Subset {subset} is not valid. Please choose from 'fullset', 'trainset', 'validset', or 'testset'.")
 

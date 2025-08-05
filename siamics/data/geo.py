@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class GEO(Data):
 
-    def __init__(self, catname='catalogue', catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, data_mode=None, root=None, embed_name=None, augment=False):
+    def __init__(self, catname='catalogue', catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, data_mode=None, root=None, embed_name=None, augment=False, single_cell=False):
         
         self.geneID = 'GeneID'
         self.grouping_col = "group_id"
@@ -35,7 +35,7 @@ class GEO(Data):
         else: raise ValueError
         
         relpath = self.organisms_dir[self.organism]
-        super().__init__("GEO", catalogue=catalogue, catname=catname, cancer_types=cancer_types, data_mode=data_mode, relpath=relpath, root=root, embed_name=embed_name, augment=augment)
+        super().__init__("GEO", catalogue=catalogue, catname=catname, cancer_types=cancer_types, data_mode=data_mode, relpath=relpath, root=root, embed_name=embed_name, augment=augment, single_cell=single_cell)
 
     def _convert_to_ensg(self, df):
         reference_path = os.path.join(self.root, 'Human.GRCh38.p13.annot.tsv')
@@ -335,9 +335,9 @@ class GEO(Data):
                         pbar.update(1)  # Update tqdm only if successful
 
 class GEO_SUBTYPE(GEO):
-    def __init__(self, catname, cancer_types, catalogue=None, organism="HomoSapien", dataType='TPM', data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
+    def __init__(self, catname, cancer_types, catalogue=None, organism="HomoSapien", dataType='TPM', data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True, single_cell=False):
         self.cancer_types=cancer_types
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
         self._gen_class_indeces_map(self.classes)
         # drop if catalogue has unknown classes
         if only_labeled_data:
@@ -351,31 +351,31 @@ class GEO_SUBTYPE(GEO):
         super().print(verbose=verbose, categories_counts=categories_counts)
 
 class GEO_SUBTYPE_BRCA(GEO_SUBTYPE):
-    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BRCA'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
+    def __init__(self, catname="catalogue_brca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BRCA'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True, single_cell=False):
         self.series = ["GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854", "GSE159448", "GSE139274", "GSE270967", "GSE110114", "GSE243375"] # TODO ADD GSE181466
         self.classes=["LuminalA", "LuminalB", "HER2", "Normal", "Basal"]
-        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
                                                 
 class GEO_SUBTYPE_BLCA(GEO_SUBTYPE):
-    def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BLCA'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
+    def __init__(self, catname="catalogue_blca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BLCA'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True, single_cell=False):
         self.series = ["GSE244957", "GSE160693", "GSE154261"]
         self.classes=["Basal", "Luminal"]        
-        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
  
 class GEO_SUBTYPE_PAAD(GEO_SUBTYPE):
-    def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['PAAD'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
+    def __init__(self, catname="catalogue_paad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['PAAD'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True, single_cell=False):
         self.series = ["GSE172356", "GSE93326"]
         self.classes=["Classical", "Basal"]
-        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
     
 class GEO_SUBTYPE_COAD(GEO_SUBTYPE):
-    def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['COAD'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True):
+    def __init__(self, catname="catalogue_coad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['COAD'], data_mode=None, embed_name=None, root=None, augment=False, only_labeled_data=True, single_cell=False):
         self.series = ["GSE190609", "GSE101588", "GSE152430", "GSE132465", "GSE144735"]
         self.classes=["CMS1","CMS2","CMS3","CMS4"]
-        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, cancer_types=cancer_types, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
 
 class GEO_SURV(GEO):
-    def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, data_mode=None, embed_name=None, root=None, augment=False, mode="overall"):
+    def __init__(self, catname="catalogue_surv", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, data_mode=None, embed_name=None, root=None, augment=False, mode="overall", single_cell=False):
         
         self.cancer_types = cancer_types
         self.series = ["GSE154261", "GSE87340", "GSE165808"]
@@ -389,7 +389,7 @@ class GEO_SURV(GEO):
 
         self.time_unit = "days"
         self.mode = mode
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
         
         if self.cancer_types is not None:
             self.filter_by_cancer_types(cancer_types=self.cancer_types)
@@ -450,8 +450,8 @@ class GEO_SURV(GEO):
         return
     
 class GEO_BATCH(GEO):
-    def __init__(self, catname=None, catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, cancer_types=None, data_mode=None, root=None, augment=False):
-        super().__init__(catname=catname, catalogue=catalogue, cancer_types=cancer_types, organism=organism, dataType=dataType, embed_name=embed_name,data_mode=data_mode, root=root, augment=augment)
+    def __init__(self, catname=None, catalogue=None, organism="HomoSapien", dataType='TPM', embed_name=None, cancer_types=None, data_mode=None, root=None, augment=False, single_cell=False):
+        super().__init__(catname=catname, catalogue=catalogue, cancer_types=cancer_types, organism=organism, dataType=dataType, embed_name=embed_name,data_mode=data_mode, root=root, augment=augment, single_cell=single_cell)
 
     def _read_batch_metadata(self, catalogue):
         batch_file = "batch_meta.csv"
@@ -504,67 +504,67 @@ class GEO_BATCH(GEO):
         return
 
 class GEO_BATCH_BRCA(GEO_BATCH):
-    def __init__(self, catname="catalogue_batch_brca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BRCA'], embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_batch_brca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BRCA'], embed_name=None, root=None, augment=False, single_cell=False):
         self.series = ["GSE243375", "GSE235052", "GSE271080", "GSE202922", "GSE260693", "GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854",  "GSE159448", "GSE139274",  "GSE270967", "GSE110114"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class GEO_BATCH_PAAD(GEO_BATCH):
-    def __init__(self, catname="catalogue_batch_paad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['PAAD'], embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_batch_paad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['PAAD'], embed_name=None, root=None, augment=False, single_cell=False):
         self.series = ["GSE242516", "GSE224564", "GSE242915", "GSE172356", "GSE93326"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class GEO_BATCH_COAD(GEO_BATCH):
-    def __init__(self, catname="catalogue_batch_coad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['COAD'], embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_batch_coad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['COAD'], embed_name=None, root=None, augment=False, single_cell=False):
         self.series = ["GSE190609", "GSE101588", "GSE152430", "GSE241699"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment, single_cell=single_cells)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class GEO_BATCH_BLCA(GEO_BATCH):
-    def __init__(self, catname="catalogue_batch_blca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BLCA'], embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_batch_blca", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['BLCA'], embed_name=None, root=None, augment=False, single_cell=False):
         self.series = ["GSE245748", "GSE236932", "GSE160693", "GSE154261"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class GEO_BATCH_OVARIAN(GEO_BATCH):
-    def __init__(self, catname="catalogue_batch_ovarian", catalogue=None, organism="HomoSapien", cancer_types=['OVARIAN'], dataType='TPM', embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_batch_ovarian", catalogue=None, organism="HomoSapien", cancer_types=['OVARIAN'], dataType='TPM', embed_name=None, root=None, augment=False, single_cell=False):
         self.series = ["GSE165808"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class GEO_BATCH_LUAD(GEO_BATCH):
-    def __init__(self, catname="catalogue_batch_luad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['LUAD'], embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_batch_luad", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=['LUAD'], embed_name=None, root=None, augment=False, single_cell=False):
         self.series = ["GSE87340"]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
         return
 
 class GEO_BATCH_6(GEO_BATCH):
-    def __init__(self, catname="catalogue_batch_6", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, data_mode=None, embed_name=None, root=None, augment=False):
+    def __init__(self, catname="catalogue_batch_6", catalogue=None, organism="HomoSapien", dataType='TPM', cancer_types=None, data_mode=None, embed_name=None, root=None, augment=False, single_cell=False):
         self.series = ["GSE243375", "GSE235052", "GSE271080", "GSE202922", "GSE260693", "GSE223470", "GSE233242", "GSE101927", "GSE71651", "GSE162187", "GSE158854",  "GSE159448", "GSE139274",  "GSE270967", "GSE110114", #BRCA
                 "GSE242516", "GSE224564", "GSE242915", "GSE172356", "GSE93326",  #PAAD
                 "GSE190609", "GSE101588", "GSE152430", "GSE241699", #COAD
@@ -573,7 +573,7 @@ class GEO_BATCH_6(GEO_BATCH):
                 "GSE87340" #LUAD
                 ]
         
-        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment)
+        super().__init__(catname=catname, catalogue=catalogue, organism=organism, cancer_types=cancer_types, dataType=dataType, data_mode=data_mode, embed_name=embed_name, root=root, augment=augment, single_cell=single_cell)
 
     def _gen_catalogue(self): 
         super()._gen_catalogue()
