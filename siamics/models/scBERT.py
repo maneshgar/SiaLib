@@ -39,7 +39,6 @@ def preprocess_data(expr):
     adata.var_names = ref_genes
     adata.obs_names = expr.index.astype(str) 
 
-    adata.obs_names_make_unique()
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata, base=2)
 
