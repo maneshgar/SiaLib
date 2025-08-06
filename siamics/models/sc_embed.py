@@ -3,7 +3,8 @@ from scipy import sparse
 import torch
 import scanpy as sc
 from siamics.data.tme import Com
-from siamics.data.tcga import TCGA_SURV
+from siamics.data.tcga import TCGA
+from siamics.data.geo import GEO_SUBTYPE_BLCA, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD, GEO_BATCH_6
 from siamics.data import DataWrapper
 import argparse, logging, os
 
@@ -11,8 +12,6 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from concurrent.futures import ProcessPoolExecutor
 from siamics.utils.futils import create_directories
-
-# from siamics.models import scBERT, gf
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -175,11 +174,19 @@ def main(dataset, model, subset='fullset', overwrite=True):
     datasets = []
     datasets_strs = dataset.split(",")
 
-    if 'com' in datasets_strs:
-        datasets.append(Com)
+    dataset_map = {
+        'com': Com,
+        'tcga': TCGA,
+        'geo': [GEO_SUBTYPE_BLCA, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD, GEO_BATCH_6],
+    }
 
-    if 'tcga_surv' in datasets_strs:
-        datasets.append(TCGA_SURV)
+    for d in datasets_strs:
+        if d in dataset_map:
+            val = dataset_map[d]
+            if isinstance(val, list):
+                datasets.extend(val)
+            else:
+                datasets.append(val)
 
     if len(datasets) == 0:
         raise ValueError(f"Invalid dataset name: {dataset}")
