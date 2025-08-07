@@ -111,7 +111,13 @@ class TME(Data):
             df_single.index.name = "sample_id"
             df_single.columns.name = None  # Remove column name (e.g., "GENE_ID")
 
-            df_single.to_pickle(f"{output_dir}/{sample_id}.pkl")
+            if(self.single_cell):
+                df_single.to_pickle(f"{output_dir}/{sample_id}_raw.pkl")
+            else:
+                df_single.to_pickle(f"{output_dir}/{sample_id}.pkl")
+        return
+
+    def _gen_catalogue(self, ext=".pkl", singleCell=False, com=False):
         return
 
     def _gen_catalogue(self, ext=".pkl", singleCell=False):
@@ -139,6 +145,24 @@ class TME(Data):
 
         patient_id_list = (metadata_alignCT["patient_id"] if singleCell else metadata_alignCT["sample_id"])
 
+        # for K fold split
+        if com:
+            def assign_source_type(sample_id):
+                if sample_id.startswith(("AA", "AB", "AC", "AD")):
+                    return "ran_silico"
+                elif sample_id.startswith(("AE", "AF", "AG", "AH")):
+                    return "bio_silico"
+                elif sample_id.startswith("BM"):
+                    return "bio_vitro"
+                elif sample_id.startswith("CID"):
+                    return "wu"
+                elif sample_id.startswith("RM"):
+                    return "ran_vitro"
+                else:
+                    return "unknown"
+
+            metadata_alignCT["source_type"] = metadata_alignCT["sample_id"].astype(str).apply(assign_source_type)
+
         self.catalogue = pd.DataFrame({
             'dataset': self.dataset_name, 
             'sample_id': metadata_alignCT["sample_id"],
@@ -153,10 +177,11 @@ class TME(Data):
             'fibroblasts_prop': metadata_alignCT["fibroblasts"],
             'endothelial_prop': metadata_alignCT["endothelial"],
             'others_prop': metadata_alignCT["others"],
-            'filename': metadata_alignCT["filename"]
+            'filename': metadata_alignCT["filename"],
+            'attribute': metadata_alignCT["source_type"]
         })
 
-        self.save(data=self.catalogue, rel_path=os.path.join("300_nosparse",f"{self.catname}.csv"))
+        self.save(data=self.catalogue, rel_path=f"{self.catname}.csv")
         return self.catalogue
 
 class SDY67(TME):
@@ -298,10 +323,19 @@ class Com(TME):
             wu_exp = wu_exp.reset_index().rename(columns={wu_exp.index.name or "index": "sample_id"})
             cols = ['sample_id'] + [col for col in wu_exp.columns if col != 'sample_id']
             wu_exp = wu_exp[cols]
-            exp_tpm = self.tpm(wu_exp)
+            if self.single_cell:
+                print("raw_wu")
+                exp = wu_exp
+            else:
+                exp = self.tpm(wu_exp)
+            # exp_tpm = self.tpm(wu_exp)
             
         elif invitro:
-            invitro_exp = pd.read_csv(f"{self.root}/og_data/GEO_ensg_tpm.csv")
+            if self.single_cell:
+                invitro_exp = pd.read_csv(f"{self.root}/og_data/GEO_ensg_counts.csv")
+            else:
+                print("raw_vitro")
+                invitro_exp = pd.read_csv(f"{self.root}/og_data/GEO_ensg_tpm.csv")
             cols = [invitro_exp.columns[0]] + [col for col in invitro_exp.columns if col.startswith("BM") or col.startswith("RM")]
             invitro_exp = invitro_exp[cols]
 
@@ -309,14 +343,19 @@ class Com(TME):
             invitro_exp = invitro_exp.T
             invitro_exp = invitro_exp.reset_index().rename(columns={invitro_exp.index.name or "index": "sample_id"})
             cols = ['sample_id'] + [col for col in invitro_exp.columns if col != 'sample_id']
-            exp_tpm= invitro_exp[cols]
+
+            exp= invitro_exp[cols]
 
         else: 
             studies = ["AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH"]
 
             all_expression = pd.DataFrame()
             for study in studies:
-                curr_exp = pd.read_csv(f"{self.root}/og_data/{study}_ensg_val_tpm.csv")
+                if self.single_cell:
+                    print("raw_vivo")
+                    curr_exp = pd.read_csv(f"{self.root}/og_data/{study}_ensg_val_cnts.csv")
+                else:
+                    curr_exp = pd.read_csv(f"{self.root}/og_data/{study}_ensg_val_tpm.csv")
                 original_columns = curr_exp.columns.tolist()
                 curr_exp.columns = [original_columns[0]] + [f"{study}_{col}" for col in original_columns[1:]]
 
@@ -329,9 +368,9 @@ class Com(TME):
             all_expression = all_expression.T
             all_expression = all_expression.reset_index().rename(columns={all_expression.index.name or "index": "sample_id"})
             cols = ['sample_id'] + [col for col in all_expression.columns if col != 'sample_id']
-            exp_tpm = all_expression[cols]
+            exp = all_expression[cols]
 
-        self._split_exp(exp_tpm)
+        self._split_exp(exp)
     
         return 
     
