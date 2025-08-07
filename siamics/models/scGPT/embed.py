@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, SequentialSampler
 from tqdm import tqdm
 
 from siamics.data.tme import Com
+from siamics.data.depMap import DepMap
 from siamics.data.tcga import TCGA, TCGA_SUBTYPE_BRCA, TCGA_SUBTYPE_BLCA, TCGA_SUBTYPE_COAD, TCGA_SUBTYPE_PAAD
 from siamics.data.geo import GEO_SURV, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_BLCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD
 from siamics.data import DataWrapper, convert_gene_ids, convert_gene_names
@@ -434,10 +435,41 @@ def main(dataset, model, subset='fullset', overwrite=True):
     if 'geo_subtype_paad' in datasets_strs:
         datasets.append(GEO_SUBTYPE_PAAD)
 
+    if 'depmap' in datasets_strs:
+        datasets.append(DepMap)
+
     if len(datasets) == 0:
         raise ValueError(f"Invalid dataset name: {dataset}")
 
-    dataset = DataWrapper(datasets, subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+    # dataset = DataWrapper(datasets, subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+
+    if DepMap in datasets:
+        def make_dedup_cls(original_cls, dedup_cat):
+            class DedupDataset(original_cls):
+                def __init__(self, *args, **kwargs):
+                    kwargs['catalogue'] = dedup_cat
+                    super().__init__(*args, **kwargs)
+            return DedupDataset
+
+        dep_full = DataWrapper(datasets=[DepMap], subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+
+        dep_obj = dep_full.datasets[0]
+        if 'sample_id' not in dep_obj.catalogue.columns:
+            raise ValueError("'sample_id' is not found in DepMap catalogue.")
+
+        dep_dedup_cat = (
+            dep_obj.catalogue
+            .drop_duplicates(subset='sample_id', keep='first')
+            .reset_index(drop=True)
+        )
+
+        DepMapDedup = make_dedup_cls(DepMap, dep_dedup_cat)
+
+        datasets = [DepMapDedup if cls is DepMap else cls for cls in datasets]
+
+
+    dataset = DataWrapper(datasets=datasets, subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+
     dataset.set_data_mode('raw')
 
     gen_embeddings(dataset)

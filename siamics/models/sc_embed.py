@@ -5,6 +5,7 @@ import scanpy as sc
 from siamics.data.tme import Com
 from siamics.data.tcga import TCGA
 from siamics.data.geo import GEO_SUBTYPE_BLCA, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD, GEO_BATCH_6
+from siamics.data.depMap import DepMap
 from siamics.data import DataWrapper
 import argparse, logging, os
 
@@ -178,6 +179,7 @@ def main(dataset, model, subset='fullset', overwrite=True):
         'com': Com,
         'tcga': TCGA,
         'geo': [GEO_SUBTYPE_BLCA, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD, GEO_BATCH_6],
+        'depmap': DepMap
     }
 
     for d in datasets_strs:
@@ -193,9 +195,36 @@ def main(dataset, model, subset='fullset', overwrite=True):
 
     dataset = DataWrapper(datasets, subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
 
-    dataset.set_data_mode('raw')
+    if DepMap in datasets:
+        def make_dedup_cls(original_cls, dedup_cat):
+            class DedupDataset(original_cls):
+                def __init__(self, *args, **kwargs):
+                    kwargs['catalogue'] = dedup_cat
+                    super().__init__(*args, **kwargs)
+            return DedupDataset
 
-    gen_embeddings(model_name=model, dataset=dataset, overwrite=overwrite)  
+        dep_full = DataWrapper(datasets=[DepMap], subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+
+        dep_obj = dep_full.datasets[0]
+        if 'sample_id' not in dep_obj.catalogue.columns:
+            raise ValueError("'sample_id' is not found in DepMap catalogue.")
+
+        dep_dedup_cat = (
+            dep_obj.catalogue
+            .drop_duplicates(subset='sample_id', keep='first')
+            .reset_index(drop=True)
+        )
+
+        DepMapDedup = make_dedup_cls(DepMap, dep_dedup_cat)
+
+        datasets = [DepMapDedup if cls is DepMap else cls for cls in datasets]
+
+
+    final_wrapper = DataWrapper(datasets=datasets, subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+
+    final_wrapper.set_data_mode('raw')
+
+    gen_embeddings(model_name=model, dataset=final_wrapper, overwrite=overwrite)  
 
 def parse_arguments():
     # Create the parser
