@@ -11,7 +11,8 @@ from torch.utils.data import DataLoader, SequentialSampler
 from tqdm import tqdm
 
 from siamics.data.tme import Com
-from siamics.data.tcga import TCGA_SURV
+from siamics.data.tcga import TCGA, TCGA_SUBTYPE_BRCA, TCGA_SUBTYPE_BLCA, TCGA_SUBTYPE_COAD, TCGA_SUBTYPE_PAAD
+from siamics.data.geo import GEO_SURV, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_BLCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD
 from siamics.data import DataWrapper, convert_gene_ids, convert_gene_names
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
@@ -32,7 +33,7 @@ def get_batch_cell_embeddings(
     model=None,
     vocab=None,
     max_length=1200,
-    batch_size=64,
+    batch_size=16,
     model_configs=None,
     gene_ids=None,
     use_batch_labels=False,
@@ -148,7 +149,7 @@ def embed_data(
     gene_ids: list,
     model_dir: PathLike,
     max_length=1200,
-    batch_size=64,
+    batch_size=16,
     device: Union[str, torch.device] = "cuda",
     use_fast_transformer: bool = True,
 ) -> AnnData:
@@ -337,7 +338,7 @@ def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
     model_dir = Path("/projects/ovcare/users/behnam_maneshgar/coding/scGPT/models/")
 
     num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
-    batch_size = 8 * num_devices 
+    batch_size = 16
 
     def collate_fn(batch):
         batch_df, metadata, dataset_specific_idx, overall_idx = dataset.collate_fn(batch, num_devices=num_devices)
@@ -359,7 +360,7 @@ def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
             batch_df,
             gene_names,
             model_dir,
-            batch_size=16,
+            batch_size=batch_size,
         )
 
         for i, item_id in enumerate(overall_idx):
@@ -412,8 +413,26 @@ def main(dataset, model, subset='fullset', overwrite=True):
     if 'com' in datasets_strs:
         datasets.append(Com)
 
-    if 'tcga_surv' in datasets_strs:
-        datasets.append(TCGA_SURV)
+    if 'tcga' in datasets_strs:
+        datasets.append(TCGA)
+
+    if 'tcga_subtype_brca' in datasets_strs:
+        datasets.append(TCGA_SUBTYPE_BRCA)
+
+    if 'geo_surv' in datasets_strs:
+        datasets.append(GEO_SURV)
+
+    if 'geo_subtype_brca' in datasets_strs:
+        datasets.append(GEO_SUBTYPE_BRCA)
+
+    if 'geo_subtype_blca' in datasets_strs:
+        datasets.append(GEO_SUBTYPE_BLCA)
+
+    if 'geo_subtype_coad' in datasets_strs:
+        datasets.append(GEO_SUBTYPE_COAD)
+
+    if 'geo_subtype_paad' in datasets_strs:
+        datasets.append(GEO_SUBTYPE_PAAD)
 
     if len(datasets) == 0:
         raise ValueError(f"Invalid dataset name: {dataset}")
