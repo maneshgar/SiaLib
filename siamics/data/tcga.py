@@ -96,6 +96,23 @@ class TCGA(Data):
     
     def print(self, verbose=True, categories_counts=["cancer_type"]):
         super().print(verbose=verbose, categories_counts=categories_counts)
+
+    def add_sample_type(self):
+        label = self.grouping_col
+        metadata = pd.read_csv("/projects/ovcare/users/tina_zhang/data/TCGA/TCGA_STAR_metadata_final.csv")
+        if label != "patient_id":
+            metadata = metadata.rename(columns={"patient_id": label})
+
+        columns_to_merge = [label, 'sample_id', 'sample_type']
+        catalogue_merged = self.catalogue.merge(
+            metadata[columns_to_merge],
+            on=[label, 'sample_id'],
+            how='left'
+        )
+
+        self.catalogue = catalogue_merged
+        self.save(data=self.catalogue, rel_path=f'{self.catname}.csv')
+        return self.catalogue
     
     # AIM function
     def cp_from_server(self, root, cancer_types=None):
