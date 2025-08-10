@@ -4,6 +4,7 @@ import torch
 import scanpy as sc
 from siamics.data.tme import Com
 from siamics.data.tcga import TCGA
+from siamics.data.gdsc import GDSC
 from siamics.data.geo import GEO_SUBTYPE_BLCA, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD, GEO_BATCH_6
 from siamics.data.depMap import DepMap
 from siamics.data import DataWrapper
@@ -179,7 +180,8 @@ def main(dataset, model, subset='fullset', overwrite=True):
         'com': Com,
         'tcga': TCGA,
         'geo': [GEO_SUBTYPE_BLCA, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD, GEO_BATCH_6],
-        'depmap': DepMap
+        'depmap': DepMap,
+        'gdsc': GDSC
     }
 
     for d in datasets_strs:
@@ -193,31 +195,39 @@ def main(dataset, model, subset='fullset', overwrite=True):
     if len(datasets) == 0:
         raise ValueError(f"Invalid dataset name: {dataset}")
 
-    dataset = DataWrapper(datasets, subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+    dedup_targets = [DepMap, GDSC]
 
-    if DepMap in datasets:
-        def make_dedup_cls(original_cls, dedup_cat):
-            class DedupDataset(original_cls):
-                def __init__(self, *args, **kwargs):
-                    kwargs['catalogue'] = dedup_cat
-                    super().__init__(*args, **kwargs)
-            return DedupDataset
+    def make_dedup_cls(original_cls, dedup_cat):
+        class DedupDataset(original_cls):
+            def __init__(self, *args, **kwargs):
+                kwargs['catalogue'] = dedup_cat
+                super().__init__(*args, **kwargs)
+        return DedupDataset
 
-        dep_full = DataWrapper(datasets=[DepMap], subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
+    for target_cls in dedup_targets:
+        if target_cls in datasets:
+            full_wrapper = DataWrapper(
+                datasets=[target_cls],
+                subset=subset,
+                embed_name=model,
+                sub_sampled=False,
+                single_cell=True,
+                cache_data=False
+            )
 
-        dep_obj = dep_full.datasets[0]
-        if 'sample_id' not in dep_obj.catalogue.columns:
-            raise ValueError("'sample_id' is not found in DepMap catalogue.")
+            target_obj = full_wrapper.datasets[0]
+            if 'sample_id' not in target_obj.catalogue.columns:
+                raise ValueError(f"'sample_id' is not found in {target_cls.__name__} catalogue.")
 
-        dep_dedup_cat = (
-            dep_obj.catalogue
-            .drop_duplicates(subset='sample_id', keep='first')
-            .reset_index(drop=True)
-        )
+            dedup_cat = (
+                target_obj.catalogue
+                .drop_duplicates(subset='sample_id', keep='first')
+                .reset_index(drop=True)
+            )
 
-        DepMapDedup = make_dedup_cls(DepMap, dep_dedup_cat)
+            DedupCls = make_dedup_cls(target_cls, dedup_cat)
 
-        datasets = [DepMapDedup if cls is DepMap else cls for cls in datasets]
+            datasets = [DedupCls if cls is target_cls else cls for cls in datasets]
 
 
     final_wrapper = DataWrapper(datasets=datasets, subset=subset, embed_name=model, sub_sampled=False, single_cell=True, cache_data=False)
