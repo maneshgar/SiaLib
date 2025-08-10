@@ -585,4 +585,100 @@ class GeneEssentiality:
             f"per-DepOI CCC: {self.perDep_ccc:.4f}"
         )
 
+class DrugResponse:
+    def __init__(self):
+        self.true_res = [[]]
+        self.pred_res = [[]]
+        self.drug = []
+
+        self.mse = None
+        self.pcc = None
+        self.scc = None
+        self.ccc = None
+
+        self.perdrug_scc = None
+        self.perdrug_pcc = None
+        self.perdrug_mse = None
+        self.perdrug_ccc = None
+    
+    def add_data(self, true_p, pred_p, drug): 
+        true_p = np.array(true_p)  
+        pred_p = np.array(pred_p)  
+
+        if true_p.ndim == 1:
+            true_p = true_p[:, None]
+        if pred_p.ndim == 1:
+            pred_p = pred_p[:, None]
+
+        if not hasattr(self, 'true_res') or self.true_res is None or isinstance(self.true_res, list):
+            self.true_res = np.zeros((0, true_p.shape[1])) 
+
+        if not hasattr(self, 'pred_res') or self.pred_res is None or isinstance(self.pred_res, list):
+            self.pred_res = np.zeros((0, pred_p.shape[1])) 
+
+        self.true_res = np.vstack((self.true_res, true_p))
+        self.pred_res = np.vstack((self.pred_res, pred_p))
+
+        if not hasattr(self, 'drug') or self.drug is None:
+            self.drug = []
+    
+        if isinstance(drug, list):
+            self.drug.extend(drug)
+        else:
+            self.drug.append(drug)
+
+    def update_metrics(self):
+        true_res = jnp.array(self.true_res)
+        pred_res = jnp.array(self.pred_res)
+        squared_error = (pred_res - true_res) ** 2 
+        self.mse = np.mean(squared_error)
+        self.scc = spearmanr(self.true_res, self.pred_res)[0]
+        self.pcc = pearsonr(self.true_res.ravel(), self.pred_res.ravel())[0]
+        self.ccc = cccr(self.true_res, self.pred_res)
+        
+        # per-drug
+        unique_drugs = np.unique(self.drug)
+        drug_sccs = []
+        drug_pccs = []
+        drug_mses = []
+        drug_cccs = []
+
+        for drug in unique_drugs:
+            indices = [i for i, d in enumerate(self.drug) if d == drug]
+            indices_arr = jnp.array(indices)
+            true_vector = true_res[indices_arr, :].flatten()
+            pred_vector = pred_res[indices_arr, :].flatten()
+
+            mse_val = float(np.mean((np.array(pred_vector) - np.array(true_vector)) ** 2))
+            drug_mses.append(mse_val)
+
+            if np.std(true_vector) != 0 and np.std(pred_vector) != 0:
+                scc_val = spearmanr(np.array(true_vector), np.array(pred_vector))[0]
+                pcc_val = pearsonr(np.array(true_vector), np.array(pred_vector))[0]
+                ccc_val = cccr(np.array(true_vector), np.array(pred_vector))
+            else:
+                scc_val = np.nan
+                pcc_val = np.nan
+                ccc_val = np.nan
+            
+            drug_sccs.append(scc_val)
+            drug_pccs.append(pcc_val)
+            drug_cccs.append(ccc_val)
+
+        self.perdrug_scc = float(np.nanmean(drug_sccs))
+        self.perdrug_pcc = float(np.nanmean(drug_pccs))
+        self.perdrug_mse = float(np.nanmean(drug_mses))
+        self.perdrug_ccc = float(np.nanmean(drug_cccs))
+
+        self.report = (
+            f"SCC: {self.scc:.4f}\n"
+            f"PCC: {self.pcc:.4f}\n"
+            f"MSE: {self.mse:.4f}\n"
+            f"CCC: {self.ccc:.4f}\n"
+            f"per-drug SCC: {self.perdrug_scc:.4f}\n"
+            f"per-drug PCC: {self.perdrug_pcc:.4f}\n"
+            f"per-drug MSE: {self.perdrug_mse:.4f}\n"
+            f"per-drug CCC: {self.perdrug_ccc:.4f}"
+        )
+
     
