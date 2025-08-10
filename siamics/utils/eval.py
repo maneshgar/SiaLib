@@ -12,6 +12,7 @@ from .futils import create_directories
 import jax.numpy as jnp
 from matplotlib.lines import Line2D
 from datetime import datetime
+from sklearn.utils.class_weight import compute_sample_weight
 
 def cccr(true_prop, pred_prop):
     mean_true = np.mean(true_prop)
@@ -175,6 +176,51 @@ class ClassificationOnTheFly:
             self.update_metrics()
         print(f"Classification Report: \n{self.titles}\n{self.report}")
         print(f"Confusion Matrix: \n{self.titles}\n{self.cm}")
+
+class Retrieval: 
+    def __init__(self, titles=None):
+        self.lbls = []
+        self.preds = []
+        self.titles = titles if titles else []
+
+    def update(self, y_true, y_pred):
+        self.lbls.extend(y_true)
+        self.preds.extend(y_pred)
+
+    def compute(self):
+        assert len(self.lbls) == len(self.preds), "Mismatch in label and prediction length."
+        results = {}
+
+        # Overall metrics
+        results['accuracy'] = metrics.accuracy_score(self.lbls, self.preds)
+        results['f1_macro'] = metrics.f1_score(self.lbls, self.preds, average='macro')
+        results['f1_weighted'] = metrics.f1_score(self.lbls, self.preds, average='weighted')
+        sample_weights = compute_sample_weight(class_weight="balanced", y=self.lbls)
+        results['weighted_accuracy'] = metrics.accuracy_score(self.lbls, self.preds, sample_weight=sample_weights)
+
+        # Classwise metrics 
+        report = metrics.classification_report(self.lbls, self.preds, output_dict=True, zero_division=0)
+        lbls_arr = np.array(self.lbls)
+        preds_arr = np.array(self.preds)
+        unique_classes = np.unique(lbls_arr)
+
+        results['classwise'] = {}
+        for cls in unique_classes:
+            cls_str = str(cls)
+            cls_mask = lbls_arr == cls
+            correct = np.sum(preds_arr[cls_mask] == cls)
+            total = np.sum(cls_mask)
+            accuracy_cls = correct / total if total > 0 else 0.0
+
+            results['classwise'][cls_str] = {
+                'precision': report[cls_str]['precision'],
+                'recall': report[cls_str]['recall'],
+                'f1': report[cls_str]['f1-score'],
+                'support': report[cls_str]['support'],
+                'accuracy': accuracy_cls 
+            }
+
+        return results
 
 class Survival:
 
