@@ -20,6 +20,18 @@ def convert_gene_names(gene_names):
 
     return [mapping.get(g) for g in gene_names]
 
+def convert_gene_ids(gene_ids):
+
+    mapping_file = "/projects/ovcare/users/tina_zhang/projects/BulkRNA/data/mapping_all.txt"
+    df = pd.read_csv(mapping_file, sep="\t")
+    
+    df["gene_name"] = df["gene_name"].astype(str).str.strip()
+    df["gene_id"] = df["gene_id"].astype(str).str.strip()
+    
+    mapping = dict(zip(df["gene_id"], df["gene_name"]))
+
+    return [mapping.get(str(g).strip()) for g in gene_ids]
+
 def remove_subids(data):
     data.columns = [item.split(".")[0] for item in data.columns]
     # Cases to handle:
@@ -500,7 +512,7 @@ class Data(Dataset):
         try: 
             df = pd.read_pickle(file_path)
         except:
-            print(f"Failed to load file: {file_path}")
+            raise FileNotFoundError(f"File not found: {file_path}")
 
         if verbos: print("   Done!")
         return df
@@ -619,8 +631,6 @@ class DataWrapper(Dataset):
 
         self.datasets_cls = datasets # GTEX, TCGA, etc.
         self.dataset_objs = [dataset(root=root, augment=augment, single_cell=single_cell) for dataset in self.datasets_cls]
-
-
 
         if subset == 'fullset':
             self.datasets = [self.datasets_cls[index](catalogue=dataset.catalogue, cancer_types=cancer_types, root=root, embed_name=embed_name, data_mode=data_mode, single_cell=single_cell) for index, dataset in enumerate(self.dataset_objs)]

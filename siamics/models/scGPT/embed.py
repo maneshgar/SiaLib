@@ -29,6 +29,10 @@ PathLike = Union[str, os.PathLike]
 
 ROOT_DIR = "/projects/ovcare/users/tina_zhang/projects/BulkRNA/"
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 def get_batch_cell_embeddings(
     count_matrix,
     model=None,
