@@ -2,6 +2,8 @@ import pandas as pd
 import os, re
 from . import Data
 from glob import glob
+from tqdm import tqdm
+import numpy as np
 
 class GDSC(Data):
     def __init__(self, catalogue=None, root=None, embed_name=None, cancer_types=None, augment=False, single_cell=False, data_mode=None):
@@ -101,7 +103,9 @@ class GDSC(Data):
             for j, value in enumerate(row):  
                 merged_df.iloc[i, j + 1] = (2 ** value) - 1
 
-    def _gen_exp_raw(self):
+        return merged_df
+
+    def _gen_exp_raw(self, merged_df):
         exp_omics_protein_raw = pd.read_csv("/projects/ovcare/users/tina_zhang/data/tests/gene_essentiality/gen_data/OmicsExpressionGenesExpectedCountProfile.csv")
 
         exp_omics_protein_raw.columns = [
@@ -140,6 +144,9 @@ class GDSC(Data):
     def _gen_drug(self):
         save_dir = "/projects/ovcare/users/tina_zhang/data/GDSC/drug"
         os.makedirs(save_dir, exist_ok=True)
+
+        path = "/projects/ovcare/users/tina_zhang/projects/KPGT/datasets/gdcs/kpgt_base.npz"
+        data = np.load(path, allow_pickle=True)
 
         fps = data["fps"]
         fps = pd.DataFrame(fps)
