@@ -20,7 +20,8 @@ import argparse, os
 from siamics.data.tme import Com
 from siamics.data.tcga import TCGA
 from siamics.data.geo import GEO_SURV, GEO_SUBTYPE_BRCA, GEO_SUBTYPE_BLCA, GEO_SUBTYPE_COAD, GEO_SUBTYPE_PAAD, GEO_BATCH_6
-from siamics.data import DataWrapper
+from siamics.data import DataWrapper, get_common_genes_main, pad_match_columns, remove_subids
+
 from concurrent.futures import ProcessPoolExecutor
 from siamics.utils.futils import create_directories
 
@@ -252,23 +253,33 @@ def extract_feature(model,
         return result_emb
 
 def save_embedding(args):
-    dset_root, dset_embed_fname, dset_embed_mean_fname, dset_gpstr, metadata, embed, mean_embed, overwrite, model_name, gene_order = args
+    dset_root = args["dset_root"]
+    dset_gene_embed_fname = args["dset_gene_embed_fname"]
+    dset_sample_embed_fname = args["dset_sample_embed_fname"]
+    dset_gpstr = args["dset_gpstr"]
+    metadata = args["metadata"]
+    sample_embed = args["sample_embed"]
+    gene_embed = args["gene_embed"]
+    overwrite = args["overwrite"]
+    model_name = args["model_name"]
+    gene_order = args["gene_order"]
+
     pid = metadata[dset_gpstr]
     sid = metadata['sample_id']
 
-    # cell-level
-    out_path = os.path.join(dset_root, dset_embed_mean_fname)
+    # sample-level
+    out_path = os.path.join(dset_root, dset_sample_embed_fname)
     if os.path.exists(out_path) and not overwrite:
         logger.info(f"File already exists and overwrite is set to False: {out_path}")
     else:    
-        if not isinstance(embed, np.ndarray):
-            embed = np.array(embed)
+        if not isinstance(sample_embed, np.ndarray):
+            sample_embed = np.array(sample_embed)
 
         data_to_save = {
             'fm_config_name': model_name,
             'group_str': pid,
             'sample_id': sid,
-            'features': mean_embed
+            'features': sample_embed
         }
         data_to_save = pd.DataFrame([data_to_save])
 
@@ -277,24 +288,24 @@ def save_embedding(args):
         if os.path.exists(out_path):
             os.remove(out_path)
         pd.to_pickle(data_to_save, out_path)
-        logger.info(f'Saved Mean Embeds: {out_path}')
+        logger.info(f'Saved Sample-level Embeds: {out_path}')
 
     # gene_level
-    out_path = os.path.join(dset_root, dset_embed_fname)
+    out_path = os.path.join(dset_root, dset_gene_embed_fname)
 
     if os.path.exists(out_path) and not overwrite:
         logger.info(f"File already exists and overwrite is set to False: {out_path}")
     else:
         # make sure it saves into pickle properly. 
-        if not isinstance(embed, np.ndarray):
-            embed = np.array(embed)
+        if not isinstance(gene_embed, np.ndarray):
+            gene_embed = np.array(gene_embed)
 
         if gene_order is not None:
             data_to_save = {
                 'fm_config_name': model_name,
                 'group_str': pid,
                 'sample_id': sid,
-                'features': embed,
+                'features': gene_embed,
                 'gene_order': gene_order,
             }
         else:
@@ -302,7 +313,7 @@ def save_embedding(args):
                 'fm_config_name': model_name,
                 'group_str': pid,
                 'sample_id': sid,
-                'features': embed
+                'features': gene_embed
             }
         data_to_save = pd.DataFrame([data_to_save])
 
@@ -311,13 +322,13 @@ def save_embedding(args):
         if os.path.exists(out_path):
             os.remove(out_path)
         pd.to_pickle(data_to_save, out_path)
-        logger.info(f'Saved Embeds: {out_path}')
+        logger.info(f'Saved Gene-Level Embeds: {out_path}')
         
     return
 
-def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
+def gen_embeddings(dataset, model_name="BulkFormer", overwrite=True):
     
-    # Configuration
+    # # Configuration
     device = 'cuda'
     graph_path = os.path.join(BULKFORMER_DIR, 'data/G_gtex.pt')
     weights_path = os.path.join(BULKFORMER_DIR, 'data/G_gtex_weight.pt')
@@ -352,7 +363,8 @@ def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
         batch_df, metadata, dataset_specific_idx, overall_idx = dataset.collate_fn(batch, num_devices=num_devices)
         return batch_df, metadata, dataset_specific_idx, overall_idx
 
-    data_loader = DataLoader(dataset, batch_size=4, shuffle=True, drop_last=False, collate_fn=collate_fn, num_workers=num_devices*2, persistent_workers=True, prefetch_factor=4)
+    batch_size = 8
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=False, collate_fn=collate_fn, num_workers=num_devices*2, persistent_workers=True, prefetch_factor=4)
 
     executor = ProcessPoolExecutor(max_workers=8)  # Persistent executor across batches
     futures = [] 
@@ -363,19 +375,17 @@ def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
     bulkformer_gene_info = pd.read_csv(os.path.join(BULKFORMER_DIR, 'data/bulkformer_gene_info.csv')) #
 
     for batch_df, metadata, dataset_specific_idx, overall_idx in tqdm(data_loader):
-        # count_matrix = batch_df.values
-
-
         # Load demo normalized data (log-transformed TPM)
-        log_tpm_df = batch_df # pd.read_csv(os.path.join(BULKFORMER_DIR, 'data/demo.csv')) # TODO
-        # print(batch_df)
-        # Load demo count data (raw count)
-        # count_df = pd.read_csv('data/demo_count_data.csv')
 
-        # Convert raw counts to normalized expression values (log-transformed TPM)
-        # gene_length_df = pd.read_csv('data/gene_length_df.csv')
-        # gene_length_dict = gene_length_df.set_index('ensg_id')['length'].to_dict()
-        # log_tpm_df = normalize_data(X_df=count_df, gene_length_dict=gene_length_dict)
+        _, batch_simp = get_common_genes_main(rna_seq_df, batch_df)
+        
+        # Replace Nans with padding token, 1- put zeros as the value, 2- keep the NaN mask 3- replace with tokenizer pad_id
+        pad_mask = batch_simp.isna()
+        batch_simp = batch_simp.fillna(0)
+
+        # Pad data with zeros and update the mask
+        batch_simp, pad_mask = pad_match_columns(rna_seq_df, batch_simp, pad_value=0, mask=pad_mask)
+        log_tpm_df = batch_simp # pd.read_csv(os.path.join(BULKFORMER_DIR, 'data/demo.csv')) # TODO
 
         bulkformer_gene_list = bulkformer_gene_info['ensg_id'].to_list()
 
@@ -395,11 +405,17 @@ def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
             feature_type='transcriptome_level',
             aggregate_type='max',
             device=device,
-            batch_size=4,
+            batch_size=batch_size,
             return_expr_value=False,
             esm2_emb=model_params['gene_emb'],
             valid_gene_idx=valid_gene_idx
         )
+
+        if torch.isnan(sample_embed).any():
+            nan_indices = torch.isnan(sample_embed).nonzero(as_tuple=True)
+            logger.warning(f"NaN detected in sample_embed at indices: {nan_indices}")
+            logger.info(f"Input data causing NaN: {input_df.values}")
+        
 
         # Extract gene-level embedding
         gene_embed = extract_feature(
@@ -409,12 +425,17 @@ def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
             feature_type='gene_level',
             aggregate_type='all',
             device=device,
-            batch_size=4,
+            batch_size=batch_size,
             return_expr_value=False,
             esm2_emb=model_params['gene_emb'],
             valid_gene_idx=valid_gene_idx
         )
 
+        if torch.isnan(gene_embed).any():
+            nan_indices = torch.isnan(gene_embed).nonzero(as_tuple=True)
+            logger.warning(f"NaN detected in sample_embed at indices: {nan_indices}")
+            logger.info(f"Input data causing NaN: {input_df.values}")
+        
         for i, item_id in enumerate(overall_idx):
             if item_id == -1:
                 logger.info(f"Skipping item_id: {item_id}")
@@ -429,25 +450,29 @@ def gen_embeddings(dataset, model_name="scGPT", overwrite=True):
 
             dset_root = active_dataset.root
             dset_gpstr = active_dataset.grouping_col
-            dset_embed_fname = active_dataset.get_embed_fname(fname, model_name, mean=False)
-            dset_embed_mean_fname = active_dataset.get_embed_fname(fname, model_name, mean=True)
+            dset_gene_embed_fname = active_dataset.get_embed_fname(fname, model_name, mean=False)
+            dset_sample_embed_fname = active_dataset.get_embed_fname(fname, model_name, mean=True)
 
             def to_numpy_safe(x):
                 if torch.is_tensor(x):
                     return x.detach().cpu().numpy()
                 return x 
 
+            embed_data = {
+                "dset_root": dset_root,
+                "dset_gene_embed_fname": dset_gene_embed_fname,
+                "dset_sample_embed_fname": dset_sample_embed_fname,
+                "dset_gpstr": dset_gpstr,
+                "metadata": metadata.iloc[i],
+                "sample_embed": to_numpy_safe(sample_embed[i]),
+                "gene_embed": to_numpy_safe(gene_embed[i]),
+                "overwrite": overwrite,
+                "model_name": model_name,
+                "gene_order": gene_order
+            }
+
             futures.append(executor.submit(
-                save_embedding, (dset_root,
-                                dset_embed_fname,
-                                dset_embed_mean_fname,
-                                dset_gpstr,
-                                metadata.iloc[i],       # only the row
-                                to_numpy_safe(sample_embed[i]),          # only one sample
-                                to_numpy_safe(gene_embed[i]),          # only one sample
-                                overwrite,
-                                model_name,
-                                gene_order)))
+                save_embedding, (embed_data)))
             
     for future in futures:
         try:
@@ -490,7 +515,7 @@ def parse_arguments():
 
     # Add arguments
     parser.add_argument('-d', '--dataset', type=str, required=True, help='The dataset to pretrain on.')
-    parser.add_argument('-m', '--model', type=str, required=False, default="scGPT", help='The foundation model config name.')
+    parser.add_argument('-m', '--model', type=str, required=False, default="BulkFormer", help='The foundation model config name.')
     # parser.add_argument('-p', '--params', type=str, required=True, help='The foundation model parameters.')
     parser.add_argument('-dbg', '--debug_mode', nargs='?', default=False, const=True, help='Enable debug mode.' )
 
@@ -502,6 +527,3 @@ if __name__ == "__main__":
     args = parse_arguments()
     main(args.dataset, args.model)
     logger.info('Application Ended Successfully!')
-
-
-
